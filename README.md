@@ -1,4 +1,7 @@
 # EECS442 Final Project Winter 2019
+## Project Proposal
+https://docs.google.com/document/d/1MhsKnpK4VmU3S7HugB5dzHH0nB5fJzRtQ00tXBrWKt0/edit?usp=sharing
+
 
 ## Resources
 ### Show, Attend and tell
@@ -12,6 +15,8 @@ https://github.com/tylin/coco-caption
 
 
 ## Data Processing
+
+### Training Data Download
 This project uses COCO 14' Dataset + preprocessed image captions which will be used as training and validation
 * I did not includ COCO dataset into this git repo due to its size (13GB for train and 6GB for val).
 Please download the COCO data set from here:   
@@ -27,6 +32,11 @@ training our network on Flickr 8k first since it is much more light weight.
 I find two unofficial sources of training images data:  
 Flickr 8k: https://www.kaggle.com/srbhshinde/flickr8k-sau  
 Flickr 30k: https://www.kaggle.com/hsankesara/flickr-image-dataset  
+
+### Data Preprocessing
+First if we use pretrained well-known CNN provided in torch vision, we need to preprocess out image
+data into a specific input format that torch vision model accepts, referring to this page:
+https://pytorch.org/docs/master/torchvision/models.html
 
 
 ## CNN Network
