@@ -4,7 +4,7 @@ from torch import nn
 import torch.nn.functional as F
 
 class Attention(nn.Module):
-    def _init__(self, attention_size, encoder_size, decoder_size):
+    def __init__(self, attention_size, encoder_size, decoder_size):
         super(Attention, self).__init__()
         #attention_dim = 512  
         #decoder_dim = 512
@@ -22,7 +22,7 @@ class Attention(nn.Module):
         out1 = out.unsqueeze(2)
         weights = (einput*out1).sum(1)
 
-        return out, weights
+        return weights, out
 
 
         
