@@ -44,11 +44,12 @@ class LSTMs(nn.Module):
         # flatten image to size (batch_size, sumofpixcel, encoder_dim)
         batch_size = encoder_out.size(0)
         encoder_dim = encoder_out.size(-1)
-        encoder_out_flatten = encoder_out.view(batch_size, -1, encoder_dim)
-        num_pixels = encoder_out_flatten.size(1)
+        encoder_out = encoder_out.view(batch_size, -1, encoder_dim)
+        num_pixels = encoder_out.size(1)
+        dic_size = self.dic_size
 
         # sort data in length of caption (useful in the for loop of LSTMs to reduce time)
-        sorted_cap_len, sorted_index = torch.sort(cap_len.squeeze(1), dim=1, descending=True)
+        sorted_cap_len, sorted_index = torch.sort(cap_len.squeeze(1), dim=0, descending=True)
         encoder_out = encoder_out[sorted_index]
         encoder_cap = encoder_cap[sorted_index]
 
@@ -61,10 +62,15 @@ class LSTMs(nn.Module):
         c = self.c(mean_encoder_out)
 
         # leave the last work <end>
-        decoder_len = (cap_len - 1).tolist()
+        decoder_len = (sorted_cap_len - 1).tolist()
+        # print(decoder_len)
         max_length = max(decoder_len)
 
         # initialize the output predictions and alpha
+        # print(batch_size)
+        # print(max_length)
+        # print(dic_size)
+
         predictions = torch.zeros(batch_size, max_length, dic_size).to(device)
         alphas = torch.zeros(batch_size, max_length, num_pixels).to(device)
 
@@ -80,13 +86,13 @@ class LSTMs(nn.Module):
             attentioned_out = mask * attention_area
 
             # run LSTM
-            h, c = self.lstm(torch.cat(cap_embedding[:subatch_index, t, :], attentioned_out, dim=1)
+            h, c = self.lstm(torch.cat([cap_embedding[:subatch_index, i, :], attentioned_out], dim=1)
                     , (h[:subatch_index], c[:subatch_index]))
             preds = self.fc_dic(self.dropout(h))
 
             #append result
-            predictions[:subatch_index, t, :] = preds
-            alphas[:subatch_index, t, :] = alpha
+            predictions[:subatch_index, i, :] = preds
+            alphas[:subatch_index, i, :] = alpha
 
         return predictions, alphas
 

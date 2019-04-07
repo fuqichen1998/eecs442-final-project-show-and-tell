@@ -13,10 +13,11 @@ class Attention(nn.Module):
         self.encoder = nn.Linear(encoder_size, attention_size)
         self.decoder = nn.Linear(decoder_size, attention_size)
         self.soft = nn.Softmax(1)
+
     def forward(self, einput, dinput):
         x1 = self.encoder(einput)
         x2 = self.decoder(dinput).unsqueeze(1)
-        out = nn.ReLU(x1+x2)
+        out = F.relu(x1+x2)
         out = self.attention(out).squeeze(2)
         out = self.soft(out)
         out1 = out.unsqueeze(2)
