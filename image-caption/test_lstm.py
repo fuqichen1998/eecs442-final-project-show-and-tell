@@ -13,7 +13,7 @@ if __name__ == "__main__":
     
     encoder_out = torch.rand((100, 32, 32, 512))
     encoder_cap = torch.rand((100, 20))
-    encoder_cap = torch.randint((100, 1))
+    cap_len = torch.rand((100, 1))
     decoder = LSTMs(encoder_dim=512, 
                 attention_dim=attention_dim,
                 embed_dim=emb_dim,
@@ -21,4 +21,4 @@ if __name__ == "__main__":
                 dic_size=5,
                 dropout=dropout)
 
-    out = decoder
+    out1, out2 = decoder(encoder_out, encoder_cap, cap_len)
