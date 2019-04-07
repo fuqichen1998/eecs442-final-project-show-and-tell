@@ -6,12 +6,13 @@ import os
 
 
 class CustomDataset(Dataset):
-    def __init__(self, path, dataset, split):
+    def __init__(self, path, dataset, split, transform=None):
         """
         :param path: path to preprocessed files
         :param dataset: Can be one of 'coco', 'flickr8k', 'flickr30k'
         :param split: 'TRAIN', 'VAL', or 'TEST'
         """
+        self.transform = transform
         self.split = split
         h5_file = h5py.File(os.path.join(path, self.split + '_IMAGES_' + dataset + '.hdf5'), 'r')
         self.caps_per_img = h5_file.attrs['caps_per_img']
@@ -25,10 +26,17 @@ class CustomDataset(Dataset):
 
         self.dataset_size = len(self.captions_indexed)
 
+
+    def __len__(self):
+        return self.dataset_size
+
+
     def __getitem__(self, i):
         img_idx = i // self.caps_per_img
         # NOTE: Each image has caps_per_img number of captions
         img = torch.FloatTensor(self.images_data[img_idx] / 255.0)
+        if self.transform:
+            img = self.transform(img)
         caption = torch.LongTensor(self.captions_indexed[i])
         cap_len = torch.LongTensor([self.cap_len[i]])
 
@@ -41,5 +49,13 @@ class CustomDataset(Dataset):
                                                                   (img_idx * self.caps_per_img + self.caps_per_img)])
             return img, caption, cap_len, all_captions
 
-    def __len__(self):
-        return self.dataset_size
+
+if __name__== "__main__":
+    train_loader = torch.utils.data.DataLoader(CustomDataset("./preprocess_out", "flickr8k", 'TRAIN'),
+                                               batch_size=8, shuffle=True, num_workers=1, pin_memory=True)
+    val_loader = torch.utils.data.DataLoader(CustomDataset("./preprocess_out", "flickr8k", 'VAL'),
+                                               batch_size=8, shuffle=True, num_workers=1, pin_memory=True)
+    for i, data in enumerate(train_loader, 0):
+        img, caption, cap_len = data
+        print(caption[0], cap_len[0])
+        break
