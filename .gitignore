@@ -3,9 +3,6 @@ Thumbs.db
 enthumbs.db
 
 #Mac
-**/img_train/*
-**/preprocess_out/*
-**/.idea/
 .DS_Store
 image-caption/caption_datasets/dataset_coco.json
 image-caption/caption_datasets/dataset_flickr8k.json

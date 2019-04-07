@@ -33,6 +33,11 @@ I find two unofficial sources of training images data:
 Flickr 8k: https://www.kaggle.com/srbhshinde/flickr8k-sau  
 Flickr 30k: https://www.kaggle.com/hsankesara/flickr-image-dataset  
 
+### Place data
+Place the unzipped image data into the "/image-caption/img_train" foler.  
+If the dataset is flickr 8k or flickr 30k, img_train folder should have a bunch of images;
+If the dataset is COCO, img_train folder should have 2 folders, `train2014/` and `val2014/`
+
 ### Data Preprocessing
 First if we use pretrained well-known CNN provided in torch vision, we need to preprocess out image
 data into a specific input format that torch vision model accepts, referring to this page:
