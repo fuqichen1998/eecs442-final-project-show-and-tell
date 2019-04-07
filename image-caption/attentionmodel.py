@@ -13,16 +13,19 @@ class Attention(nn.Module):
         self.encoder = nn.Linear(encoder_size, attention_size)
         self.decoder = nn.Linear(decoder_size, attention_size)
         self.soft = nn.Softmax(1)
-    def forward(self, einput, dinput):
-        x1 = self.encoder(einput)
-        x2 = self.decoder(dinput).unsqueeze(1)
-        out = nn.ReLU(x1+x2)
-        out = self.attention(out).squeeze(2)
-        out = self.soft(out)
-        out1 = out.unsqueeze(2)
-        weights = (einput*out1).sum(1)
 
-        return weights, out
+    def forward(self, einput, dinput):
+        x1 = self.encoder(einput) #n * (h*w) * att_c
+        x2 = self.decoder(dinput).unsqueeze(1) #n * 1 * att_c
+        out = F.relu(x1+x2) # n* (h*w) * att_c
+        out = self.attention(out).squeeze(2) #n * (h*w)
+        out = self.soft(out) #n * (h*w)
+        out1 = out.unsqueeze(2) # n * (h*w) *1
+        weights = (einput*out1).sum(1) # [n*(h*w)*enc] * [n * (h*w) * 1] = N*C
+        #weights dimension: N*C
+        #out(alpha) dimension: N * (H*W)
+        return weights,out
+
 
 
         
