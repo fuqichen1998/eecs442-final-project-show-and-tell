@@ -37,6 +37,10 @@ Flickr 30k: https://www.kaggle.com/hsankesara/flickr-image-dataset
 First if we use pretrained well-known CNN provided in torch vision, we need to preprocess out image
 data into a specific input format that torch vision model accepts, referring to this page:
 https://pytorch.org/docs/master/torchvision/models.html
+  
+Then we will also need to create a data loader which will be used to load each training/val/test data
+and fed to pytorch CNN RNN.  
+https://stanford.edu/~shervine/blog/pytorch-how-to-generate-data-parallel
 
 
 ## CNN Network

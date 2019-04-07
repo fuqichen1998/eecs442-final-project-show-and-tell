@@ -2,12 +2,14 @@ import numpy as np
 import os
 from tqdm import tqdm
 import json
-from scipy.misc import imread, imresize
+from scipy.misc import imresize
+from imageio import imread
 from collections import Counter
 import random
 import h5py
 
 
+# This data loading file is derived from public kaggle kernel: https://www.kaggle.com/rohitag13/create-data-imagecaptioning
 def process_images_captions(dataset='coco', cap_json_path='./caption_datasets/dataset_coco.json', img_path='./img_train',
                             out_path='./preprocess_out', min_word_freq=5, max_cap_len=80, caps_per_img=5):
     """
@@ -22,6 +24,7 @@ def process_images_captions(dataset='coco', cap_json_path='./caption_datasets/da
 
     :param dataset: Can be one of 'coco', 'flickr8k', 'flickr30k'
     :param cap_json_path: JSON file that preprocesses image caption labels, see readme file for details
+    This JSON file is downloaded from http://cs.stanford.edu/people/karpathy/deepimagesent/caption_datasets.zip
     :param img_path: path that contain all training images. If using coco data set, make sure immg_path contains two
     sub folders "train2014/" and "val2014/" which will be the COCO data downloaded from COCO website
     :param out_path: ouput files will be written to this folder
@@ -31,9 +34,115 @@ def process_images_captions(dataset='coco', cap_json_path='./caption_datasets/da
     :param caps_per_img: Captions per image that will be compiled to output file
     :return: No return. All preprocessed files will be written to out_path
     """
-    # TODO: TO implement this function
-    return
+    train_paths = []
+    train_caps = []
+    val_paths = []
+    val_caps = []
+    test_paths = []
+    test_caps = []
+    # Counter usage: https://pymotw.com/2/collections/counter.html
+    word_freq = Counter()
+
+    with open(cap_json_path, 'r') as j:
+        data = json.load(j)
+
+    for img in data['images']:
+        # caps example : [['a', 'wolverine'], ['a', 'b'], ['c']]
+        cap = []
+        path = None
+        for sentence in img['sentences']:
+            # Append sentence to caption
+            if max_cap_len >= len(sentence['tokens']):
+                cap.append(sentence['tokens'])
+            # Update word frequency count
+            word_freq.update(sentence['tokens'])
+
+        # If this image has no captions, skip the rest of the storing process
+        if len(cap) == 0:
+            continue
+
+        # Distribute captions and paths to train, validation, test
+        if dataset == 'coco':
+            path = os.path.join(img_path, img['filepath'], img['filename'])
+        else:
+            path = os.path.join(img_path, img['filename'])
+
+        if img['split'] in {'train', 'restval'}:
+            train_paths.append(path)
+            train_caps.append(cap)
+        elif img['split'] in {'val'}:
+            val_paths.append(path)
+            val_caps.append(cap)
+        elif img['split'] in {'test'}:
+            test_paths.append(path)
+            test_caps.append(cap)
+
+    # Create word map
+    # qualified_words = []
+    word_map = {'<pad>': 0}
+    idx = 1
+    for key in word_freq.keys():
+        if word_freq[key] > min_word_freq:
+            word_map[key] = idx
+            idx += 1
+    special_idx = len(word_map) + 1
+    word_map['<unk>'] = special_idx
+    word_map['<start>'] = special_idx
+    word_map['<end>'] = special_idx
+
+    with open(os.path.join(out_path, 'DICTIONARY_WORDS_' + dataset + '.json'), 'w') as j:
+        json.dump(word_map, j)
+
+    random.seed(442)
+    process_img(train_paths, train_caps, 'TRAIN', out_path, dataset, caps_per_img, word_map, max_cap_len)
+    process_img(val_paths, val_caps, 'VAL', out_path, dataset, caps_per_img, word_map, max_cap_len)
+    process_img(test_paths, test_caps, 'TEST', out_path, dataset, caps_per_img, word_map, max_cap_len)
+
+
+def process_img(img_paths, img_caps, split, out_path, dataset, caps_per_img, word_map, max_cap_len):
+    with h5py.File(os.path.join(out_path, split + '_IMAGES_' + dataset + '.hdf5')) as h5_file:
+        print("\nNow Writing to h5py file " + split + '_IMAGES_' + dataset + ".hdf5 with " + str(len(img_paths)) + " images:")
+
+        h5_file.attrs['caps_per_img'] = caps_per_img
+        h5_file.attrs['max_cap_len'] = max_cap_len
+
+        h5_img_dataset = h5_file.create_dataset('images_data', (len(img_paths), 3, 256, 256), dtype='uint8')
+
+        captions_indexed = []
+        cap_len = []
+
+        for idx, path in enumerate(tqdm(img_paths)):
+            if len(img_caps[idx]) < caps_per_img:
+                captions = img_caps[idx] + random.choice(img_caps[idx], caps_per_img - len(img_caps[idx]))
+            else:
+                captions = random.sample(img_caps[idx], k=caps_per_img)
+
+            # Read images
+            img = imread(img_paths[idx])
+            # print(img.shape)
+            img = imresize(img, (256, 256, 3)).transpose(2, 0, 1)
+
+            # Save image to HDF5 file
+            h5_img_dataset[idx] = img
+
+            for cap in captions:
+                # <start> + tokens + <end> + <pad> * padding_length
+                indexed_cap = []
+                indexed_cap.append(word_map['<start>'])
+                indexed_cap = indexed_cap + [word_map.get(word, word_map['<unk>']) for word in cap]
+                indexed_cap.append(word_map['<end>'])
+                indexed_cap = indexed_cap + [word_map['<pad>']] * (max_cap_len - len(cap))
+                captions_indexed.append(indexed_cap)
+                # add 2 due to start and end
+                cap_len.append(len(cap) + 2)
+
+        # Save encoded captions and their lengths to JSON files
+        with open(os.path.join(out_path, split + '_CAPTIONS_' + dataset + '.json'), 'w') as j:
+            json.dump(captions_indexed, j)
+
+        with open(os.path.join(out_path, split + '_CAPTION_LEN_' + dataset + '.json'), 'w') as j:
+            json.dump(cap_len, j)
 
 
 if __name__== "__main__":
-    process_images_captions()
+    process_images_captions('flickr8k', './caption_datasets/dataset_flickr8k.json')
