@@ -11,7 +11,8 @@ import h5py
 
 # This data loading file is derived from public kaggle kernel: https://www.kaggle.com/rohitag13/create-data-imagecaptioning
 def process_images_captions(dataset='coco', cap_json_path='./caption_datasets/dataset_coco.json', img_path='./img_train',
-                            out_path='./preprocess_out', min_word_freq=5, max_cap_len=80, caps_per_img=5):
+                            out_path='./preprocess_out', min_word_freq=5, max_cap_len=80, caps_per_img=5,
+                            img_out_dimension = (224, 224)):
     """
     Process the image datasets and also the caption json file associated with that image datasets.
     The default dataset is coco, but also supports flickr 8k and flickr 30k
@@ -94,19 +95,19 @@ def process_images_captions(dataset='coco', cap_json_path='./caption_datasets/da
         json.dump(word_map, j)
 
     random.seed(442)
-    process_img(train_paths, train_caps, 'TRAIN', out_path, dataset, caps_per_img, word_map, max_cap_len)
-    process_img(val_paths, val_caps, 'VAL', out_path, dataset, caps_per_img, word_map, max_cap_len)
-    process_img(test_paths, test_caps, 'TEST', out_path, dataset, caps_per_img, word_map, max_cap_len)
+    process_img(train_paths, train_caps, 'TRAIN', out_path, dataset, caps_per_img, word_map, max_cap_len, img_out_dimension)
+    process_img(val_paths, val_caps, 'VAL', out_path, dataset, caps_per_img, word_map, max_cap_len, img_out_dimension)
+    process_img(test_paths, test_caps, 'TEST', out_path, dataset, caps_per_img, word_map, max_cap_len, img_out_dimension)
 
 
-def process_img(img_paths, img_caps, split, out_path, dataset, caps_per_img, word_map, max_cap_len):
+def process_img(img_paths, img_caps, split, out_path, dataset, caps_per_img, word_map, max_cap_len, img_out_dimension):
     with h5py.File(os.path.join(out_path, split + '_IMAGES_' + dataset + '.hdf5')) as h5_file:
         print("\nNow Writing to h5py file " + split + '_IMAGES_' + dataset + ".hdf5 with " + str(len(img_paths)) + " images:")
 
         h5_file.attrs['caps_per_img'] = caps_per_img
         h5_file.attrs['max_cap_len'] = max_cap_len
 
-        h5_img_dataset = h5_file.create_dataset('images_data', (len(img_paths), 3, 256, 256), dtype='uint8')
+        h5_img_dataset = h5_file.create_dataset('images_data', (len(img_paths), 3, img_out_dimension[0], img_out_dimension[1]), dtype='uint8')
 
         captions_indexed = []
         cap_len = []
@@ -120,7 +121,7 @@ def process_img(img_paths, img_caps, split, out_path, dataset, caps_per_img, wor
             # Read images
             img = imread(img_paths[idx])
             # print(img.shape)
-            img = imresize(img, (256, 256, 3)).transpose(2, 0, 1)
+            img = imresize(img, (img_out_dimension[0], img_out_dimension[1], 3)).transpose(2, 0, 1)
 
             # Save image to HDF5 file
             h5_img_dataset[idx] = img
