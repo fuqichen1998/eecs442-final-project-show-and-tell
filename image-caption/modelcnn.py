@@ -8,7 +8,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
 
 class CNN(nn.Module):
-    def _init__(self, encodingsize = 14):
+    def __init__(self, encodingsize = 14):
         super(CNN, self).__init__()
         vgg16 = models.vgg16(pretrained=True)
         layerlist = list(vgg16.children())
