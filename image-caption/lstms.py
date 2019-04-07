@@ -1,11 +1,12 @@
 import torch
 import torchvision
 from torch import nn
+from attentionmodel import *
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class LSTMs(nn.Module):
-    def __init__(self, encoder_dim, attention_dim, embed_dim, decoder_dim, dic_size, drop=0.5):
+    def __init__(self, encoder_dim, attention_dim, embed_dim, decoder_dim, dic_size, dropout=0.5):
         super(LSTMs, self).__init__()
 
         # dimensions
@@ -15,13 +16,13 @@ class LSTMs(nn.Module):
         self.decoder_dim = decoder_dim
         self.dic_size = dic_size
 
-        # TODO add attention
-        self.attention  = None
+        #attention
+        self.attention = Attention(attention_dim, encoder_dim, decoder_dim)
 
         # modules
         self.embedding = nn.Embedding(dic_size, embed_dim)
         self.lstm = nn.LSTMCell(embed_dim + encoder_dim, decoder_dim, bias=True)
-        self.dropout = nn.Dropout(p=drop)
+        self.dropout = nn.Dropout(p=dropout)
         self.h = nn.Linear(encoder_dim, decoder_dim)
         self.c = nn.Linear(encoder_dim, decoder_dim)
         self.fc_sig = nn.Linear(decoder_dim, encoder_dim)
@@ -31,10 +32,11 @@ class LSTMs(nn.Module):
         # weight initialization
         self.init_weight()
 
-    def init_weight():
-        if isinstance(m, nn.Linear):
-            nn.init.uniform_(m.weight, -0.1, 0.1)
-            nn.init.constant_(m.bias, 0)
+    def init_weight(self):
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.uniform_(m.weight, -0.1, 0.1)
+                nn.init.constant_(m.bias, 0)
         self.embedding.weight.data.uniform_(-0.1, 0.1)
 
     def forward(self, encoder_out, encoder_cap, cap_len):
