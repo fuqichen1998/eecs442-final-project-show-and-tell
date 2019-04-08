@@ -63,12 +63,12 @@ class LSTMs(nn.Module):
 
         # leave the last work <end>
         decoder_len = (sorted_cap_len - 1).tolist()
-        # print(decoder_len)
         max_length = max(decoder_len)
 
         # initialize the output predictions and alpha
         # print(batch_size)
         # print(max_length)
+        # print(dic_size)
         # print(dic_size)
 
         predictions = torch.zeros(batch_size, max_length, dic_size).to(device)
@@ -94,7 +94,7 @@ class LSTMs(nn.Module):
             predictions[:subatch_index, i, :] = preds
             alphas[:subatch_index, i, :] = alpha
 
-        return predictions, alphas
+        return predictions, encoder_cap, decoder_len
 
         
 

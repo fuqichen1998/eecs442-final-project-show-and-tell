@@ -9,7 +9,7 @@ if __name__ == "__main__":
     attention_dim = 512  # dimension of attention linear layers
     decoder_dim = 512  # dimension of decoder RNN
     dropout = 0.5
-    N = 100
+    N = 2
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # sets device for model and PyTorch tensors
     
     encoder_out = torch.rand((N, 32, 32, 512))
@@ -23,6 +23,7 @@ if __name__ == "__main__":
                 dropout=dropout)
 
     out1, out2 = decoder(encoder_out, encoder_cap, cap_len)
+    print(out1)
     # x = torch.tensor([3])
     # embembedding = nn.Embedding(5, 3)
     # print(embembedding(encoder_cap))
