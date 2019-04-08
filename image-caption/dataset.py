@@ -50,13 +50,13 @@ class CustomDataset(Dataset):
             return img, caption, cap_len, all_captions
 
 
-if __name__== "__main__":
-    train_loader = torch.utils.data.DataLoader(CustomDataset("./preprocess_out", "flickr8k", 'TRAIN'),
-                                               batch_size=8, shuffle=True, num_workers=1, pin_memory=True)
-    val_loader = torch.utils.data.DataLoader(CustomDataset("./preprocess_out", "flickr8k", 'VAL'),
-                                               batch_size=8, shuffle=True, num_workers=1, pin_memory=True)
-    for i, data in enumerate(train_loader, 0):
-        img, caption, cap_len = data
-        # print(caption[0], cap_len[0])
-        print(cap_len.shape)
-        break
+# if __name__== "__main__":
+#     train_loader = torch.utils.data.DataLoader(CustomDataset("./preprocess_out", "flickr8k", 'TRAIN'),
+#                                                batch_size=8, shuffle=True, num_workers=1, pin_memory=True)
+#     val_loader = torch.utils.data.DataLoader(CustomDataset("./preprocess_out", "flickr8k", 'VAL'),
+#                                                batch_size=8, shuffle=True, num_workers=1, pin_memory=True)
+#     for i, data in enumerate(train_loader):
+#         img, caption, cap_len = data
+#         # print(caption[0], cap_len[0])
+#         print(cap_len.shape)
+#         break

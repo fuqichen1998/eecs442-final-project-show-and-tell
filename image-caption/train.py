@@ -1,0 +1,146 @@
+import torch
+import torch.backends.cudnn as cudnn
+import os
+from torchvision import transforms
+import torchvision.models as models
+from dataset import CustomDataset
+from helper import load_checkpoint
+from torch import nn
+from lstms import *
+import json
+from modelcnn import *
+import torch.nn.functional as F
+from torch.nn.utils.rnn import pack_padded_sequence
+
+# device
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# Model parameters
+encoder_dim = 512  # dimension of CNN
+decoder_dim = 512  # dimension of LSTMs
+emb_dim = 512  # dimension of embeddings
+attention_dim = 512  # dimension of attention
+dict_size = None
+dropout = 0.5
+
+best_bleu_score = 0.
+decoder_lr = 1e-4  # learning rate for decoder
+alpha_c = 1.  # regularization parameter for 'doubly stochastic attention'
+
+cudnn.benchmark = True  # set to true only if inputs to model are fixed size; otherwise lot of computational overhead
+
+
+def main():
+    start_epoch = 0
+    numepoch = 1
+
+    # Load word map into memory
+    word_map_path = "./preprocess_out"
+    dataset = "flickr8k"
+    word_map = None
+    with open(os.path.join("./preprocess_out", 'DICTIONARY_WORDS_' + dataset + '.json'), 'r') as file:
+        word_map = json.load(file)
+        dict_size = len(word_map)
+
+    # TODO: load train and validation data _ XIE
+    # https://pytorch.org/docs/master/torchvision/models.html
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
+    train_loader = torch.utils.data.DataLoader(CustomDataset("./preprocess_out", "flickr8k", 'TRAIN',
+                                                             transform=transforms.Compose([normalize])),
+                                               batch_size=8, shuffle=True, num_workers=1, pin_memory=True)
+    val_loader = torch.utils.data.DataLoader(CustomDataset("./preprocess_out", "flickr8k", 'VAL',
+                                                           transform=transforms.Compose([normalize])),
+                                             batch_size=8, shuffle=True, num_workers=1, pin_memory=True)
+
+    # TODO: Change Load checkpoint Name
+    # check_point_name = ""
+    # encoder, decoder, decoder_opt, last_epoch, best_bleu_score = load_checkpoint(check_point_name)
+    # start_epoch = last_epoch + 1
+
+    # move to device if possibble
+    encoder = CNN().to(device)
+    decoder = LSTMs(encoder_dim=encoder_dim,
+                    attention_dim=attention_dim,
+                    embed_dim=emb_dim,
+                    decoder_dim=decoder_dim,
+                    dic_size=dict_size,
+                    dropout=dropout)
+    decoder_opt = torch.optim.Adam(params=decoder.parameters(), lr=decoder_lr)
+    criterion = nn.CrossEntropyLoss().to(device)
+
+    for epoch in range(start_epoch, numepoch):
+        ######################################
+        # TODO: check convergence
+
+        # begin train
+        ######################################
+        encoder.train()
+        decoder.train()
+
+        # Batches
+        for i, (img, caption, cap_len) in enumerate(train_loader):
+            # use GPU if possible
+            img = img.to(device)
+            caption = caption.to(device)
+            cap_len = cap_len.to(device)
+
+            # forward
+            decoder_opt.zero_grad()
+            encoded = encoder(img)
+            print("img", img.shape)
+            print("encoded", encoded.shape)
+            preds, sorted_caps, decoded_len, alphas = decoder(encoded, caption, cap_len)
+
+            # ignore the begin word
+            trues = caption[:, 1:]
+
+            # pack and pad
+            preds, _ = pack_padded_sequence(preds, decoded_len, batch_first=True)
+            trues, _ = pack_padded_sequence(trues, decoded_len, batch_first=True)
+
+            # calculate loss
+            loss = criterion(preds, trues)
+            loss += alpha_c * (1. - alphas.sum(dim=1) ** 2).mean()
+            loss.backward()
+
+            # update weight
+            decoder_opt.step()
+
+            # TODO: print performance
+
+        ######################################
+        # end trian
+
+        # validate and return score
+        #######################################
+        # TODO: check if with torch.no_grad(): necessary
+        for i, (img, caption, cap_len, all_captions) in enumerate(val_loader):
+            # use GPU if possible
+            img = img.to(device)
+            caption = caption.to(device)
+            cap_len = cap_len.to(device)
+
+            # forward
+            encoded = encoder(img)
+            preds, sorted_caps, decoded_len, alphas = decoder(encoded, caption, cap_len)
+
+            # ignore the begin word
+            trues = caption[:, 1:]
+
+            # pack and pad
+            preds, _ = pack_padded_sequence(preds, decoded_len, batch_first=True)
+            trues, _ = pack_padded_sequence(trues, decoded_len, batch_first=True)
+
+            # calculate loss
+            loss = criterion(preds, trues)
+            loss += alpha_c * (1. - alphas.sum(dim=1) ** 2).mean()
+
+            # TODO: print performance
+
+        #######################################
+        # check if there is improvement
+
+
+if __name__== "__main__":
+    main()
