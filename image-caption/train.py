@@ -27,8 +27,8 @@ dropout = 0.5
 best_bleu_score = 0.
 decoder_lr = 1e-2  # learning rate for decoder
 alpha_c = 1.  # regularization parameter for 'doubly stochastic attention'
-stepsize = 10
-gamma = 0.99
+stepsize = 50
+gamma = 0.9
 
 cudnn.benchmark = True  # set to true only if inputs to model are fixed size; otherwise lot of computational overhead
 
@@ -51,10 +51,10 @@ def main():
                                      std=[0.229, 0.224, 0.225])
     train_loader = torch.utils.data.DataLoader(CustomDataset("./preprocess_out", "flickr8k", 'TRAIN',
                                                              transform=transforms.Compose([normalize])),
-                                               batch_size=200, shuffle=True, num_workers=1, pin_memory=True)
+                                               batch_size=50, shuffle=True, num_workers=1, pin_memory=True)
     val_loader = torch.utils.data.DataLoader(CustomDataset("./preprocess_out", "flickr8k", 'VAL',
                                                            transform=transforms.Compose([normalize])),
-                                             batch_size=200, shuffle=True, num_workers=1, pin_memory=True)
+                                             batch_size=50, shuffle=True, num_workers=1, pin_memory=True)
 
     # TODO: Change Load checkpoint Name
     # check_point_name = ""
@@ -90,8 +90,7 @@ def main():
         for i, (img, caption, cap_len) in enumerate(train_loader):
             print("Iteration: ", i)
             # use GPU if possible
-            if i%100 == 0:
-                scheduler.step()
+            scheduler.step()
             img = img.to(device)
             caption = caption.to(device)
             cap_len = cap_len.to(device)
@@ -126,41 +125,65 @@ def main():
 
         
 
-        val_loss_all = 0
+        
         # validate and return score
+        val_loss_all = 0
+        true_labels = []
+        pred_labels = []
         #######################################
         # TODO: check if with torch.no_grad(): necessary
-        for i, (img, caption, cap_len, all_captions) in enumerate(val_loader):
-            # use GPU if possible
-            img = img.to(device)
-            caption = caption.to(device)
-            cap_len = cap_len.to(device)
+        with torch.no_grad():
+            for i, (img, caption, cap_len, all_captions) in enumerate(val_loader):
+                # use GPU if possible
+                img = img.to(device)
+                caption = caption.to(device)
+                cap_len = cap_len.to(device)
 
-            # forward
-            encoded = encoder(img)
-            preds, sorted_caps, decoded_len, alphas = decoder(encoded, caption, cap_len)
+                # forward
+                encoded = encoder(img)
+                preds, sorted_caps, decoded_len, alphas, sorted_index = decoder(
+                    encoded, caption, cap_len)
 
-            # ignore the begin word
-            trues = caption[:, 1:]
+                # ignore the begin word
+                pred_caps = sorted_caps[:, 1:]
 
-            # pack and pad
-            preds, _ = pack_padded_sequence(preds, decoded_len, batch_first=True)
-            trues, _ = pack_padded_sequence(trues, decoded_len, batch_first=True)
+                # pack and pad
+                preds, _ = pack_padded_sequence(preds, decoded_len, batch_first=True)
+                trues, _ = pack_padded_sequence(trues, decoded_len, batch_first=True)
 
-            # calculate loss
-            loss = criterion(preds, trues)
-            loss += alpha_c * (1. - alphas.sum(dim=1) ** 2).mean()
-            val_loss_all += loss
+                # calculate loss
+                loss = criterion(preds, trues)
+                loss += alpha_c * (1. - alphas.sum(dim=1) ** 2).mean()
+                val_loss_all += loss
 
-            # TODO: print performance
-        print("Validation Loss All: ", val_loss_all)
+                # TODO: print performance
+                all_captions = all_captions[sorted_index]
+                for j in range(all_captions.shape[0]):
+                    mg_caps = allcaps[j].tolist()
+                    img_captions = list(
+                        map(lambda c: [w for w in c if w not in {word_map['<start>'], word_map['<pad>']}],
+                            img_caps))  # remove <start> and pads
+                    references.append(img_captions)
+                _, predmax = torch.max(preds, dim=2)
+                predmax = predmax.tolist()
+                temp_preds = list()
+                for j, p in enumerate(predmax):
+                    temp_preds.append(
+                        predmax[j][:decoded_len[j]])  # remove pads
+                predmax = temp_preds
+                hypotheses.extend(predmax)
+                assert len(references) == len(hypotheses)
+            
+            print("Validation Loss All: ", val_loss_all)
+            bleu4 = corpus_bleu(references, hypotheses)
+            print("bleu4 score: ", bleu4)
         #######################################
 
 
         # check if there is improvement
 
         # Save Checkpoint
-        save_checkpoint(encoder, decoder, decoder_opt, dataset, epoch, 0, False)
+        save_checkpoint(encoder, decoder, decoder_opt, dataset, epoch, 0, True)
 
 
 

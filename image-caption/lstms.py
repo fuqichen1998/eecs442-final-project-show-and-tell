@@ -93,7 +93,7 @@ class LSTMs(nn.Module):
             predictions[:subatch_index, i, :] = preds
             alphas[:subatch_index, i, :] = alpha
 
-        return predictions, encoder_cap, decoder_len, alphas
+        return predictions, encoder_cap, decoder_len, alphas, sorted_index
 
         
 
