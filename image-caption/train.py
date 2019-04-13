@@ -146,7 +146,7 @@ def main():
 
                 # ignore the begin word
                 trues = sorted_caps[:, 1:]
-
+                preds2 = preds.clone()
                 # pack and pad
                 preds, _ = pack_padded_sequence(preds, decoded_len, batch_first=True)
                 trues, _ = pack_padded_sequence(trues, decoded_len, batch_first=True)
@@ -164,7 +164,7 @@ def main():
                         map(lambda c: [w for w in c if w not in {word_map['<start>'], word_map['<pad>']}],
                             img_caps))  # remove <start> and pads
                     references.append(img_captions)
-                _, predmax = torch.max(preds, dim=2)
+                _, predmax = torch.max(preds2, dim=2)
                 predmax = predmax.tolist()
                 temp_preds = list()
                 for j, p in enumerate(predmax):
