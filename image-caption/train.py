@@ -159,7 +159,7 @@ def main():
                 # TODO: print performance
                 all_captions = all_captions[sorted_index]
                 for j in range(all_captions.shape[0]):
-                    mg_caps = allcaps[j].tolist()
+                    mg_caps = all_captions[j].tolist()
                     img_captions = list(
                         map(lambda c: [w for w in c if w not in {word_map['<start>'], word_map['<pad>']}],
                             img_caps))  # remove <start> and pads
