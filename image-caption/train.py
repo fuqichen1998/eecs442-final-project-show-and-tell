@@ -72,7 +72,7 @@ def main():
     decoder_opt = torch.optim.Adam(
         params=decoder.parameters(), lr=decoder_lr)
     scheduler = torch.optim.lr_scheduler.StepLR(
-        optimizer, step_size=stepsize, gamma=gamma)
+        decoder_opt, step_size=stepsize, gamma=gamma)
     criterion = nn.CrossEntropyLoss().to(device)
 
     for epoch in range(start_epoch, numepoch):
