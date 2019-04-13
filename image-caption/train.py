@@ -100,7 +100,7 @@ def main():
             encoded = encoder(img)
             # print("img", img.shape)
             # print("encoded", encoded.shape)
-            preds, sorted_caps, decoded_len, alphas = decoder(encoded, caption, cap_len)
+            preds, sorted_caps, decoded_len, alphas, _ = decoder(encoded, caption, cap_len)
 
             # ignore the begin word
             trues = caption[:, 1:]
