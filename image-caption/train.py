@@ -128,8 +128,8 @@ def main():
         
         # validate and return score
         val_loss_all = 0
-        true_labels = []
-        pred_labels = []
+        references = []
+        hypotheses = []
         #######################################
         # TODO: check if with torch.no_grad(): necessary
         with torch.no_grad():
@@ -159,7 +159,7 @@ def main():
                 # TODO: print performance
                 all_captions = all_captions[sorted_index]
                 for j in range(all_captions.shape[0]):
-                    mg_caps = all_captions[j].tolist()
+                    img_caps = all_captions[j].tolist()
                     img_captions = list(
                         map(lambda c: [w for w in c if w not in {word_map['<start>'], word_map['<pad>']}],
                             img_caps))  # remove <start> and pads
