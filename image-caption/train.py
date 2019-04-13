@@ -11,6 +11,7 @@ import json
 from modelcnn import *
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pack_padded_sequence
+from nltk.translate.bleu_score import corpus_bleu
 
 # device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -48,10 +49,10 @@ def main():
                                      std=[0.229, 0.224, 0.225])
     train_loader = torch.utils.data.DataLoader(CustomDataset("./preprocess_out", "flickr8k", 'TRAIN',
                                                              transform=transforms.Compose([normalize])),
-                                               batch_size=8, shuffle=True, num_workers=1, pin_memory=True)
+                                               batch_size=200, shuffle=True, num_workers=1, pin_memory=True)
     val_loader = torch.utils.data.DataLoader(CustomDataset("./preprocess_out", "flickr8k", 'VAL',
                                                            transform=transforms.Compose([normalize])),
-                                             batch_size=8, shuffle=True, num_workers=1, pin_memory=True)
+                                             batch_size=200, shuffle=True, num_workers=1, pin_memory=True)
 
     # TODO: Change Load checkpoint Name
     # check_point_name = ""
