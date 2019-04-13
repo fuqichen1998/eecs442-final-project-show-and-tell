@@ -145,7 +145,7 @@ def main():
                     encoded, caption, cap_len)
 
                 # ignore the begin word
-                pred_caps = sorted_caps[:, 1:]
+                trues = sorted_caps[:, 1:]
 
                 # pack and pad
                 preds, _ = pack_padded_sequence(preds, decoded_len, batch_first=True)
