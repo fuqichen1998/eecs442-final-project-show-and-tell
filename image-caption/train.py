@@ -4,7 +4,7 @@ import os
 from torchvision import transforms
 import torchvision.models as models
 from dataset import CustomDataset
-from helper import load_checkpoint
+from helper import load_checkpoint, save_checkpoint
 from torch import nn
 from lstms import *
 import json
@@ -75,11 +75,14 @@ def main():
 
         # begin train
         ######################################
+        print("=========== Epoch: ", epoch, "=============")
+        
         encoder.train()
         decoder.train()
 
-        # Batches
+        # Batches Train
         for i, (img, caption, cap_len) in enumerate(train_loader):
+            print("Iteration: ", i)
             # use GPU if possible
             img = img.to(device)
             caption = caption.to(device)
@@ -88,8 +91,8 @@ def main():
             # forward
             decoder_opt.zero_grad()
             encoded = encoder(img)
-            print("img", img.shape)
-            print("encoded", encoded.shape)
+            # print("img", img.shape)
+            # print("encoded", encoded.shape)
             preds, sorted_caps, decoded_len, alphas = decoder(encoded, caption, cap_len)
 
             # ignore the begin word
@@ -104,6 +107,7 @@ def main():
             loss += alpha_c * (1. - alphas.sum(dim=1) ** 2).mean()
             loss.backward()
 
+            print("Loss: ", loss)
             # update weight
             decoder_opt.step()
 
@@ -112,34 +116,44 @@ def main():
         ######################################
         # end trian
 
+        
+
         # validate and return score
         #######################################
         # TODO: check if with torch.no_grad(): necessary
-        for i, (img, caption, cap_len, all_captions) in enumerate(val_loader):
-            # use GPU if possible
-            img = img.to(device)
-            caption = caption.to(device)
-            cap_len = cap_len.to(device)
+        # for i, (img, caption, cap_len, all_captions) in enumerate(val_loader):
+        #     # use GPU if possible
+        #     img = img.to(device)
+        #     caption = caption.to(device)
+        #     cap_len = cap_len.to(device)
 
-            # forward
-            encoded = encoder(img)
-            preds, sorted_caps, decoded_len, alphas = decoder(encoded, caption, cap_len)
+        #     # forward
+        #     encoded = encoder(img)
+        #     preds, sorted_caps, decoded_len, alphas = decoder(encoded, caption, cap_len)
 
-            # ignore the begin word
-            trues = caption[:, 1:]
+        #     # ignore the begin word
+        #     trues = caption[:, 1:]
 
-            # pack and pad
-            preds, _ = pack_padded_sequence(preds, decoded_len, batch_first=True)
-            trues, _ = pack_padded_sequence(trues, decoded_len, batch_first=True)
+        #     # pack and pad
+        #     preds, _ = pack_padded_sequence(preds, decoded_len, batch_first=True)
+        #     trues, _ = pack_padded_sequence(trues, decoded_len, batch_first=True)
 
-            # calculate loss
-            loss = criterion(preds, trues)
-            loss += alpha_c * (1. - alphas.sum(dim=1) ** 2).mean()
+        #     # calculate loss
+        #     loss = criterion(preds, trues)
+        #     loss += alpha_c * (1. - alphas.sum(dim=1) ** 2).mean()
 
             # TODO: print performance
 
         #######################################
+
+
         # check if there is improvement
+
+        # Save Checkpoint
+        save_checkpoint(encoder, decoder, decoder_opt, dataset, epoch, 0, False)
+
+
+
 
 
 if __name__== "__main__":

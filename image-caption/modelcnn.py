@@ -20,12 +20,12 @@ class CNN(nn.Module):
     def forward(self, input):
         #input dimension: batchsize*3*224*224
         x = self.vgg16(input)
-        print('1. ', x.shape)
+        # print('1. ', x.shape)
         #input dimension: batchsize*512*14*14 (inputH/16)
         x = self.pool_reshape(x)
-        print('2. ', x.shape)
+        # print('2. ', x.shape)
         #input dimension: batchsize*512*14*14 (inputH/16)
         x = x.permute(0, 2, 3, 1)
-        print('3. ', x.shape)
+        # print('3. ', x.shape)
         #output dimension: batchsize*14*14*512 #TODO:check
         return x

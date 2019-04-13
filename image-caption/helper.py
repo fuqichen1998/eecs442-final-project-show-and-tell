@@ -1,7 +1,7 @@
 import torch
 import os
 
-def save_checkpoint(encoder, decoder, encoder_opt, decoder_opt, dataset, epoch_num, bleu, is_highest_score):
+def save_checkpoint(encoder, decoder, decoder_opt, dataset, epoch_num, bleu, is_highest_score):
     state = {
         'encoder': encoder,
         'decoder': decoder,
