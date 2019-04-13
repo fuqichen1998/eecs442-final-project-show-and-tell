@@ -67,7 +67,7 @@ def main():
                     dic_size=dict_size,
                     dropout=dropout).to(device)
     decoder_opt = torch.optim.Adam(
-        params=decoder.parameters(), lr=decoder_lr).to(device)
+        params=decoder.parameters(), lr=decoder_lr)
     criterion = nn.CrossEntropyLoss().to(device)
 
     for epoch in range(start_epoch, numepoch):
@@ -108,7 +108,7 @@ def main():
             loss += alpha_c * (1. - alphas.sum(dim=1) ** 2).mean()
             loss.backward()
 
-            print("Loss: ", loss)
+            print("Training Loss: ", loss)
             # update weight
             decoder_opt.step()
 
@@ -119,32 +119,34 @@ def main():
 
         
 
+        val_loss_all = 0
         # validate and return score
         #######################################
         # TODO: check if with torch.no_grad(): necessary
-        # for i, (img, caption, cap_len, all_captions) in enumerate(val_loader):
-        #     # use GPU if possible
-        #     img = img.to(device)
-        #     caption = caption.to(device)
-        #     cap_len = cap_len.to(device)
+        for i, (img, caption, cap_len, all_captions) in enumerate(val_loader):
+            # use GPU if possible
+            img = img.to(device)
+            caption = caption.to(device)
+            cap_len = cap_len.to(device)
 
-        #     # forward
-        #     encoded = encoder(img)
-        #     preds, sorted_caps, decoded_len, alphas = decoder(encoded, caption, cap_len)
+            # forward
+            encoded = encoder(img)
+            preds, sorted_caps, decoded_len, alphas = decoder(encoded, caption, cap_len)
 
-        #     # ignore the begin word
-        #     trues = caption[:, 1:]
+            # ignore the begin word
+            trues = caption[:, 1:]
 
-        #     # pack and pad
-        #     preds, _ = pack_padded_sequence(preds, decoded_len, batch_first=True)
-        #     trues, _ = pack_padded_sequence(trues, decoded_len, batch_first=True)
+            # pack and pad
+            preds, _ = pack_padded_sequence(preds, decoded_len, batch_first=True)
+            trues, _ = pack_padded_sequence(trues, decoded_len, batch_first=True)
 
-        #     # calculate loss
-        #     loss = criterion(preds, trues)
-        #     loss += alpha_c * (1. - alphas.sum(dim=1) ** 2).mean()
+            # calculate loss
+            loss = criterion(preds, trues)
+            loss += alpha_c * (1. - alphas.sum(dim=1) ** 2).mean()
+            val_loss_all += loss
 
             # TODO: print performance
-
+        print("Validation Loss All: ", val_loss_all)
         #######################################
 
 
