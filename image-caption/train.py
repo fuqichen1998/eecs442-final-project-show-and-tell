@@ -65,8 +65,9 @@ def main():
                     embed_dim=emb_dim,
                     decoder_dim=decoder_dim,
                     dic_size=dict_size,
-                    dropout=dropout)
-    decoder_opt = torch.optim.Adam(params=decoder.parameters(), lr=decoder_lr)
+                    dropout=dropout).to(device)
+    decoder_opt = torch.optim.Adam(
+        params=decoder.parameters(), lr=decoder_lr).to(device)
     criterion = nn.CrossEntropyLoss().to(device)
 
     for epoch in range(start_epoch, numepoch):
