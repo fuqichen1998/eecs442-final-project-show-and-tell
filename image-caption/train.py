@@ -25,8 +25,10 @@ dict_size = None
 dropout = 0.5
 
 best_bleu_score = 0.
-decoder_lr = 1e-4  # learning rate for decoder
+decoder_lr = 1e-2  # learning rate for decoder
 alpha_c = 1.  # regularization parameter for 'doubly stochastic attention'
+stepsize = 10
+gamma = 0.99
 
 cudnn.benchmark = True  # set to true only if inputs to model are fixed size; otherwise lot of computational overhead
 
@@ -69,6 +71,8 @@ def main():
                     dropout=dropout).to(device)
     decoder_opt = torch.optim.Adam(
         params=decoder.parameters(), lr=decoder_lr)
+    scheduler = torch.optim.lr_scheduler.StepLR(
+        optimizer, step_size=stepsize, gamma=gamma)
     criterion = nn.CrossEntropyLoss().to(device)
 
     for epoch in range(start_epoch, numepoch):
@@ -86,6 +90,8 @@ def main():
         for i, (img, caption, cap_len) in enumerate(train_loader):
             print("Iteration: ", i)
             # use GPU if possible
+            if i%100 == 0:
+                scheduler.step()
             img = img.to(device)
             caption = caption.to(device)
             cap_len = cap_len.to(device)
