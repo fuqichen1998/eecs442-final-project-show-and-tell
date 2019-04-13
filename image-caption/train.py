@@ -25,7 +25,7 @@ dict_size = None
 dropout = 0.5
 
 best_bleu_score = 0.
-decoder_lr = 1e-2  # learning rate for decoder
+decoder_lr = 4e-4  # learning rate for decoder
 alpha_c = 1.  # regularization parameter for 'doubly stochastic attention'
 stepsize = 50
 gamma = 0.9
