@@ -183,7 +183,7 @@ def main():
         # check if there is improvement
 
         # Save Checkpoint
-        save_checkpoint(encoder, decoder, decoder_opt, dataset, epoch, 0, True)
+        # save_checkpoint(encoder, decoder, decoder_opt, dataset, epoch, 0, True)
 
 
 
