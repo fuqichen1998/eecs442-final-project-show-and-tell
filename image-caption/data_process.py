@@ -43,6 +43,7 @@ def process_images_captions(dataset='coco', cap_json_path='./caption_datasets/da
     test_caps = []
     # Counter usage: https://pymotw.com/2/collections/counter.html
     word_freq = Counter()
+    data = None
 
     with open(cap_json_path, 'r') as j:
         data = json.load(j)
@@ -86,13 +87,12 @@ def process_images_captions(dataset='coco', cap_json_path='./caption_datasets/da
         if word_freq[key] > min_word_freq:
             word_map[key] = idx
             idx += 1
-    special_idx = len(word_map) + 1
-    word_map['<unk>'] = special_idx
-    word_map['<start>'] = special_idx
-    word_map['<end>'] = special_idx
+    word_map['<unk>'] = idx
+    word_map['<start>'] = idx
+    word_map['<end>'] = idx
 
-    with open(os.path.join(out_path, 'DICTIONARY_WORDS_' + dataset + '.json'), 'w') as j:
-        json.dump(word_map, j)
+    with open(os.path.join(out_path, 'DICTIONARY_WORDS_' + dataset + '.json'), 'w') as f:
+        json.dump(word_map, f)
 
     random.seed(442)
     process_img(train_paths, train_caps, 'TRAIN', out_path, dataset, caps_per_img, word_map, max_cap_len, img_out_dimension)
@@ -120,10 +120,10 @@ def process_img(img_paths, img_caps, split, out_path, dataset, caps_per_img, wor
 
             # Read images
             img = imread(img_paths[idx])
-            # print(img.shape)
             img = imresize(img, (img_out_dimension[0], img_out_dimension[1], 3)).transpose(2, 0, 1)
-
+            # print(img.shape)
             # Save image to HDF5 file
+            assert img.shape == (3, 256, 256)
             h5_img_dataset[idx] = img
 
             for cap in captions:
