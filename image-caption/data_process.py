@@ -12,7 +12,7 @@ import h5py
 # This data loading file is derived from public kaggle kernel: https://www.kaggle.com/rohitag13/create-data-imagecaptioning
 def process_images_captions(dataset='coco', cap_json_path='./caption_datasets/dataset_coco.json', img_path='./img_train',
                             out_path='./preprocess_out', min_word_freq=5, max_cap_len=80, caps_per_img=5,
-                            img_out_dimension = (224, 224)):
+                            img_out_dimension = (256, 256)):
     """
     Process the image datasets and also the caption json file associated with that image datasets.
     The default dataset is coco, but also supports flickr 8k and flickr 30k
@@ -88,7 +88,9 @@ def process_images_captions(dataset='coco', cap_json_path='./caption_datasets/da
             word_map[key] = idx
             idx += 1
     word_map['<unk>'] = idx
+    idx += 1
     word_map['<start>'] = idx
+    idx += 1
     word_map['<end>'] = idx
 
     with open(os.path.join(out_path, 'DICTIONARY_WORDS_' + dataset + '.json'), 'w') as f:
@@ -123,7 +125,7 @@ def process_img(img_paths, img_caps, split, out_path, dataset, caps_per_img, wor
             img = imresize(img, (img_out_dimension[0], img_out_dimension[1], 3)).transpose(2, 0, 1)
             # print(img.shape)
             # Save image to HDF5 file
-            assert img.shape == (3, 256, 256)
+            # assert img.shape == (3, 256, 256)
             h5_img_dataset[idx] = img
 
             for cap in captions:
