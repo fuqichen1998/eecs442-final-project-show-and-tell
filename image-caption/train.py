@@ -27,14 +27,14 @@ dropout = 0.5
 best_bleu_score = 0.
 decoder_lr = 4e-4  # learning rate for decoder
 alpha_c = 1.  # regularization parameter for 'doubly stochastic attention'
-stepsize = 50
-gamma = 0.9
+stepsize = 1
+gamma = 0.99
 
 cudnn.benchmark = True  # set to true only if inputs to model are fixed size; otherwise lot of computational overhead
 
 def main():
     start_epoch = 0
-    numepoch = 1
+    numepoch = 20
 
     # Load word map into memory
     word_map_path = "./preprocess_out"
@@ -50,10 +50,10 @@ def main():
                                      std=[0.229, 0.224, 0.225])
     train_loader = torch.utils.data.DataLoader(CustomDataset("./preprocess_out", "flickr8k", 'TRAIN',
                                                              transform=transforms.Compose([normalize])),
-                                               batch_size=50, shuffle=True, num_workers=1, pin_memory=True)
+                                               batch_size=48, shuffle=True, num_workers=1, pin_memory=True)
     val_loader = torch.utils.data.DataLoader(CustomDataset("./preprocess_out", "flickr8k", 'VAL',
                                                            transform=transforms.Compose([normalize])),
-                                             batch_size=50, shuffle=True, num_workers=1, pin_memory=True)
+                                             batch_size=48, shuffle=True, num_workers=1, pin_memory=True)
 
     # TODO: Change Load checkpoint Name
     # check_point_name = ""
@@ -84,11 +84,12 @@ def main():
         # encoder.train()
         decoder.train()
 
+        scheduler.step()
+
         # Batches Train
         for i, (img, caption, cap_len) in enumerate(train_loader):
             print("Iteration: ", i)
             # use GPU if possible
-            scheduler.step()
             img = img.to(device)
             caption = caption.to(device)
             cap_len = cap_len.to(device)
@@ -183,7 +184,7 @@ def main():
         # check if there is improvement
 
         # Save Checkpoint
-        # save_checkpoint(encoder, decoder, decoder_opt, dataset, epoch, 0, True)
+        save_checkpoint(encoder, decoder, decoder_opt, dataset, epoch, 0, True)
 
 
 
