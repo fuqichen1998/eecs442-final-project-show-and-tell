@@ -130,6 +130,7 @@ def main():
         hypotheses = []
         #######################################
         # TODO: check if with torch.no_grad(): necessary
+        decoder.eval()
         with torch.no_grad():
             for i, (img, caption, cap_len, all_captions) in enumerate(val_loader):
                 # use GPU if possible
