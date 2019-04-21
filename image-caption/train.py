@@ -81,7 +81,7 @@ def main():
         # begin train
         ######################################
         print("=========== Epoch: ", epoch, "=============")
-        encoder.train()
+        # encoder.train()
         decoder.train()
 
         # Batches Train
