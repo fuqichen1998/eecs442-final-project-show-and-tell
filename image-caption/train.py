@@ -32,7 +32,6 @@ gamma = 0.9
 
 cudnn.benchmark = True  # set to true only if inputs to model are fixed size; otherwise lot of computational overhead
 
-
 def main():
     start_epoch = 0
     numepoch = 1
@@ -82,7 +81,6 @@ def main():
         # begin train
         ######################################
         print("=========== Epoch: ", epoch, "=============")
-        
         encoder.train()
         decoder.train()
 
@@ -94,16 +92,16 @@ def main():
             img = img.to(device)
             caption = caption.to(device)
             cap_len = cap_len.to(device)
+            decoder_opt.zero_grad()
 
             # forward
-            decoder_opt.zero_grad()
             encoded = encoder(img)
             # print("img", img.shape)
             # print("encoded", encoded.shape)
             preds, sorted_caps, decoded_len, alphas, _ = decoder(encoded, caption, cap_len)
 
             # ignore the begin word
-            trues = caption[:, 1:]
+            trues = sorted_caps[:, 1:]
 
             # pack and pad
             preds, _ = pack_padded_sequence(preds, decoded_len, batch_first=True)
@@ -111,7 +109,7 @@ def main():
 
             # calculate loss
             loss = criterion(preds, trues)
-            loss += alpha_c * (1. - alphas.sum(dim=1) ** 2).mean()
+            loss += alpha_c * ((1. - alphas.sum(dim=1)) ** 2).mean()
             loss.backward()
 
             print("Training Loss: ", loss)
