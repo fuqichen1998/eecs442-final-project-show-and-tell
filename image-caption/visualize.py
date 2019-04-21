@@ -3,10 +3,12 @@ import torchvision.transforms as transforms
 from nltk.translate.bleu_score import corpus_bleu
 from dataset import *
 from helper import *
+import imageio
 from tqdm import tqdm
 import torch.nn.functional as Func
 
 ## Parameters ##
+output_path = "./test_caption_out"
 dataset = "flickr8k"
 num_imgs = 50
 check_point_name = "best_checkpoint_flickr8k.pth.tar"
@@ -20,29 +22,30 @@ with open(dictionary_json_path, 'r') as file:
 dict_len = len(word_dict)
 
 def search_caption(img, use_beam_search=False, beam_size=5):
-    return
+    return []
 
 
 def beam_search():
-    return
+    return []
 
 def decode_caption():
-    return
+    return []
 
 if __name__ == '__main__':
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
     test_loader = torch.utils.data.DataLoader(CustomDataset("./preprocess_out", "flickr8k", 'TEST',
                                                              transform=transforms.Compose([normalize])),
-                                               batch_size=48, shuffle=True, num_workers=1, pin_memory=True)
+                                               batch_size=1, shuffle=True, num_workers=1, pin_memory=True)
     encoded_cap = search_caption(test_loader)
     decoded_cap = decode_caption()
-    counter = 1
+
     for i, (image, caps, caplens, allcaps) in enumerate(tqdm(test_loader)):
-        if counter > num_imgs:
+        if i % 5 != 0:
+            continue
+        if i / 5 >= num_imgs:
             break
-        counter += 1
         # print(len(image), len(caps), len(caplens))
-        print("Image ")
+        print("Image ", image)
         print("True caption for ")
         print("Decoded caption for image ", " ", " is:\n", decoded_cap)
