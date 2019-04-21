@@ -8,7 +8,6 @@ class Attention(nn.Module):
         super(Attention, self).__init__()
         #attention_dim = 512  
         #decoder_dim = 512
-        #encoder_dim = 512 (2048 in original setting)
         self.attention = nn.Linear(attention_size, 1)
         self.encoder = nn.Linear(encoder_size, attention_size)
         self.decoder = nn.Linear(decoder_size, attention_size)
@@ -21,7 +20,8 @@ class Attention(nn.Module):
         out = self.attention(out).squeeze(2) #n * (h*w)
         out = self.soft(out) #n * (h*w)
         out1 = out.unsqueeze(2) # n * (h*w) *1
-        weights = (einput*out1).sum(1) # [n*(h*w)*enc] * [n * (h*w) * 1] = N*C
+        # [n*(h*w)*enc] * [n * (h*w) * 1] = n*(h*w)*enc
+        weights = (einput*out1).sum(1)
         #weights dimension: N*C
         #out(alpha) dimension: N * (H*W)
         return weights,out
