@@ -20,9 +20,9 @@ class Attention(nn.Module):
         out = self.attention(out).squeeze(2) #n * (h*w)
         out = self.soft(out) #n * (h*w)
         out1 = out.unsqueeze(2) # n * (h*w) *1
-        # [n*(h*w)*enc] * [n * (h*w) * 1] = n*(h*w)*enc
+        # ([n*(h*w)*enc] * [n * (h*w) * 1]).sum(1) = n*enc
         weights = (einput*out1).sum(1)
-        #weights dimension: N*C
+        #weights dimension: n*enc
         #out(alpha) dimension: N * (H*W)
         return weights,out
 

@@ -10,24 +10,32 @@ class LSTMs(nn.Module):
         super(LSTMs, self).__init__()
 
         # dimensions
-        self.encoder_dim = encoder_dim
-        self.attention_dim = attention_dim
-        self.embed_dim = embed_dim
-        self.decoder_dim = decoder_dim
-        self.dic_size = dic_size
+        self.encoder_dim = encoder_dim # 512
+        self.attention_dim = attention_dim  # 512
+        self.embed_dim = embed_dim  # 512
+        self.decoder_dim = decoder_dim  # 512
+        self.dic_size = dic_size  # 1000+
 
         #attention
         self.attention = Attention(attention_dim, encoder_dim, decoder_dim)
 
-        # modules
+        # embedding
         self.embedding = nn.Embedding(dic_size, embed_dim)
+
+        # lstm
         self.lstm = nn.LSTMCell(embed_dim + encoder_dim, decoder_dim, bias=True)
-        self.dropout = nn.Dropout(p=dropout)
+
+        # intialization layer h and c for lstm module
         self.h = nn.Linear(encoder_dim, decoder_dim)
         self.c = nn.Linear(encoder_dim, decoder_dim)
+
+        # fully connected layers
         self.fc_sig = nn.Linear(decoder_dim, encoder_dim)
-        self.sigmoid = nn.Sigmoid()
         self.fc_dic = nn.Linear(decoder_dim, dic_size)
+
+        # dropout and sigmoid
+        self.dropout = nn.Dropout(p=dropout)
+        self.sigmoid = nn.Sigmoid()
         
         # weight initialization
         self.init_weight()
@@ -42,27 +50,27 @@ class LSTMs(nn.Module):
     def forward(self, encoder_out, encoder_cap, cap_len):
 
         # flatten image to size (batch_size, sumofpixcel, encoder_dim)
-        batch_size = encoder_out.size(0)
-        encoder_dim = encoder_out.size(-1)
-        encoder_out = encoder_out.view(batch_size, -1, encoder_dim)
-        num_pixels = encoder_out.size(1)
-        dic_size = self.dic_size
+        encoder_out = encoder_out.view(
+            encoder_out.size(0), -1, encoder_out.size(-1)) # n*(h*w)*enc
+        
+        num_pixels = encoder_out.size(1) # h*w
+        dic_size = self.dic_size # dic
 
         # sort data in length of caption (useful in the for loop of LSTMs to reduce time)
-        sorted_cap_len, sorted_index = torch.sort(cap_len.squeeze(1), dim=0, descending=True)
-        encoder_out = encoder_out[sorted_index]
-        encoder_cap = encoder_cap[sorted_index]
+        sorted_cap_len, sorted_index = torch.sort(cap_len.squeeze(1), dim=0, descending=True) # n*1
+        encoder_out = encoder_out[sorted_index]  # n*(h*w)*enc
+        encoder_cap = encoder_cap[sorted_index]  # n*maxL
 
         # embedding
-        cap_embedding = self.embedding(encoder_cap)
+        cap_embedding = self.embedding(encoder_cap)  # n*maxL*dic
 
         # initializa LSTM Cell
-        mean_encoder_out = encoder_out.mean(dim=1)
-        h = self.h(mean_encoder_out)
-        c = self.c(mean_encoder_out)
+        mean_encoder_out = encoder_out.mean(dim=1)  # n*enc
+        h = self.h(mean_encoder_out)  # n*dec
+        c = self.c(mean_encoder_out)  # n*dec
 
         # leave the last work <end>
-        decoder_len = (sorted_cap_len - 1).tolist()
+        decoder_len = (sorted_cap_len - 1).tolist()  # n*1
         max_length = max(decoder_len)
 
         # initialize the output predictions and alpha
@@ -70,28 +78,46 @@ class LSTMs(nn.Module):
         # print(max_length)
         # print(dic_size)
         # print(dic_size)
-        predictions = torch.zeros(batch_size, max_length, dic_size).to(device)
-        alphas = torch.zeros(batch_size, max_length, num_pixels).to(device)
+        predictions = torch.zeros(
+            batch_size, max_length, dic_size).to(device)  # n*maxL*dic
+        alphas = torch.zeros(batch_size, max_length,
+                             num_pixels).to(device)  # n*maxL*(h*w)
 
         # loop over the max length of caption
         for i in range(max_length):
             # the sub batch have length of caption greater than i
             # should be put into i^th LSTM
-            subatch_index = sum([l > i for l in decoder_len])
+            subatch_index = sum([l > i for l in decoder_len]) # n'
 
-            # attention area
+            # get attention area and alpha
+            # ========================================
             attention_area, alpha = self.attention(encoder_out[:subatch_index], h[:subatch_index])
-            mask = self.sigmoid(self.fc_sig(h[:subatch_index]))
-            attentioned_out = mask * attention_area
+            # attention_area n'*enc
+            # alpha n'*(h*w)
+            # ========================================
+
+
+            # ========================================
+            # gate scale
+            mask = self.fc_sig(h[:subatch_index])  # n'*enc
+            softmask = self.sigmoid(mask)  # n'*enc
+            attentioned_out = softmask * attention_area  # n'*enc
+            # ========================================
 
             # run LSTM
-            h, c = self.lstm(torch.cat([cap_embedding[:subatch_index, i, :], attentioned_out], dim=1)
-                    , (h[:subatch_index], c[:subatch_index]))
-            preds = self.fc_dic(self.dropout(h))
+            # ========================================
+            # concate the captions and attentioned area
+            # n'*dic cat n'*enc = n' * (dic + enc)
+            xt = torch.cat(
+                [cap_embedding[:subatch_index, i, :], attentioned_out], dim=1)
+            # run LSTMcell
+            h, c = self.lstm(xt , (h[:subatch_index], c[:subatch_index]))
+            preds = self.fc_dic(self.dropout(h))  # n'*dic
+            # ========================================
 
             #append result
-            predictions[:subatch_index, i, :] = preds
-            alphas[:subatch_index, i, :] = alpha
+            predictions[:subatch_index, i, :] = preds  # n'*dic
+            alphas[:subatch_index, i, :] = alpha  # n'*(h*w)
 
         return predictions, encoder_cap, decoder_len, alphas, sorted_index
 
