@@ -151,11 +151,17 @@ class LSTMs(nn.Module):
         topkscore_all = list()
         topkalpha_all = list()
 
+        # the length of word we are going to predict
         step = 1
+
+        # initialize the h and c based on encodered out
         h = self.h(encoder_out.mean(dim=1))
         c = self.c(encoder_out.mean(dim=1))
 
+        # while we have not get k captions
         while True:
+            # SAME as that in the forward
+            # =========================================
             # embedding
             embedding = self.embedding(prewords)  # s*1*emb
             embedding = embedding.squeeze(1) # s*emb
@@ -167,43 +173,60 @@ class LSTMs(nn.Module):
             xt = torch.cat([embedding, attentioned_out], dim=1)
             h, c = self.lstm(xt, (h,c))
             preds = self.fc_dic(h)  # s*dic
+            #=========================================
+
+            # soft max for the scores of predicts
             preds = F.log_softmax(preds, dim=1)  # s*dic
 
+            # calculate all the scores that with previous predicted word 
+            # and the current word
             preds = topkscore.expend_as(preds) + preds  # s*dic
 
+            # in the first, all the current words are the same("<begin>")
+            # thus no need to look at all
+            # otherwise, choose the top k in the map
             if step == 1:
                 topkscore, topkcap = preds[0].topk(k, 0, True, True)
             else:
                 topkscore, topkcap = preds.view(-1).topk(k, 0, True, True)
 
+            # get the index among the k captions
             precapinx = topkcap / dic_size
+            # get the ibdex for the next word for the captions
             nexcapinx = topkcap % dic_size
 
+            # append the word and alpha(attentiob mask) to the captions
             topkcap = torch.cat([topkcap[precapinx], nexcapinx.unsqueeze(1)], dim=1) # s*(step + 1)
             topkalpha = torch.cat(
                 [topkalpha[precapinx], alpha[nexcapinx].unsqueeze(1)], dim=1)  # s*(step + 1)*-1*-1
             h = h[precapinx]
             c = c[precapinx]
             encoder_out = encoder_out[precapinx]
-
+            
+            # calculate the index of the captions which is not endding
             nonendinx = []
             for idx, nexcap in enumerate(nexcapinx):
                 if nexcap != word_map['<end>']:
                     nonendinx.append(idx)
+            
+            # calculate the index of the captions which is endded
             nonendset = set(nonendinx)
             allset = set(range(len(nexcapinx)))
             nonendset = set(nonendinx)
             endinx = list(allset - nonendset)
 
+            # appended the ended captions to the result and decrement k
             if len(endinx) > 0:
                 topkcap_all.extend(topkcap[endinx].tolist())
                 topkalpha_all.extend(topkalpha[endinx].tolist())
                 topkscore_all.extend(topkscore[endinx])
                 k -= len(endinx)
             
+            # if already find k captions, break and to find the max
             if k==0:
                 break
             
+            # update all the list, state and so on
             topkcap = topkcap[nonendinx]
             topkalpha = topkalpha[nonendinx]
             topkscore = topkscore[nonendinx].unsqueeze(1)
@@ -213,10 +236,14 @@ class LSTMs(nn.Module):
             topkscore = topkscore[nonendinx].unsqueeze(1)
             prewords = prewords[nonendinx].unsqueeze(1)
 
+            # if length too long, break
             if step > 30:
                 break
             step += 1
 
+        # find the max index based on the scores
+        # return the best captions and its corresponding alpha by
+        # max index
         maxinx = topkscore_all.index(max(topkscore_all))
         bestcap = topkcap_all[maxinx]
         bestalpha = topkalpha_all[maxinx]

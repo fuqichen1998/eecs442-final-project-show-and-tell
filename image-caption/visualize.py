@@ -133,7 +133,7 @@ if __name__ == '__main__':
     # validate(normalize)
     test_loader = torch.utils.data.DataLoader(CustomDataset("./preprocess_out", "flickr8k", 'TEST',
                                                             transform=transforms.Compose([normalize])),
-                                              batch_size=1, shuffle=True, num_workers=1, pin_memory=True)
+                                              batch_size=1, shuffle=False, num_workers=1, pin_memory=True)
     for i, (image, caps, caplens, allcaps) in enumerate(test_loader):
         if i % 5 != 0:
             continue
