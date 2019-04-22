@@ -132,7 +132,7 @@ class LSTMs(nn.Module):
         dic_size = self.dic_size  # dic
 
         # sort data in length of caption (useful in the for loop of LSTMs to reduce time)
-        encoder_out = encoder_out.expend(k, num_pixels, encoder_out.size(2))  # k*(h*w)*enc
+        encoder_out = encoder_out.expand(k, num_pixels, encoder_out.size(2))  # k*(h*w)*enc
 
         # initialize first word for k same image is <start>
         prewords = torch.LongTensor([[word_map['<start>']]] * k).to(device) # k*1
@@ -180,7 +180,7 @@ class LSTMs(nn.Module):
 
             # calculate all the scores that with previous predicted word 
             # and the current word
-            preds = topkscore.expend_as(preds) + preds  # s*dic
+            preds = topkscore.expand_as(preds) + preds  # s*dic
 
             # in the first, all the current words are the same("<begin>")
             # thus no need to look at all
