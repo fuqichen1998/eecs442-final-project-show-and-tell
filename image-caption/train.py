@@ -56,20 +56,20 @@ def main():
                                              batch_size=48, shuffle=True, num_workers=1, pin_memory=True)
 
     # TODO: Change Load checkpoint Name
-    # check_point_name = ""
-    # encoder, decoder, decoder_opt, last_epoch, best_bleu_score = load_checkpoint(check_point_name)
-    # start_epoch = last_epoch + 1
+    check_point_name = "best_checkpoint_flickr8k.pth.tar"
+    encoder, decoder, decoder_opt, last_epoch, best_bleu_score = load_checkpoint(check_point_name)
+    start_epoch = last_epoch + 1
 
     # move to device if possibble
-    encoder = CNN().to(device)
-    decoder = LSTMs(encoder_dim=encoder_dim,
-                    attention_dim=attention_dim,
-                    embed_dim=emb_dim,
-                    decoder_dim=decoder_dim,
-                    dic_size=dict_size,
-                    dropout=dropout).to(device)
-    decoder_opt = torch.optim.Adam(
-        params=decoder.parameters(), lr=decoder_lr)
+    # encoder = CNN().to(device)
+    # decoder = LSTMs(encoder_dim=encoder_dim,
+    #                 attention_dim=attention_dim,
+    #                 embed_dim=emb_dim,
+    #                 decoder_dim=decoder_dim,
+    #                 dic_size=dict_size,
+    #                 dropout=dropout).to(device)
+    # decoder_opt = torch.optim.Adam(
+    #     params=decoder.parameters(), lr=decoder_lr)
     scheduler = torch.optim.lr_scheduler.StepLR(
         decoder_opt, step_size=stepsize, gamma=gamma)
     criterion = nn.CrossEntropyLoss().to(device)
