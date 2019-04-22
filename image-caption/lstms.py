@@ -62,7 +62,7 @@ class LSTMs(nn.Module):
         encoder_cap = encoder_cap[sorted_index]  # n*maxL
 
         # embedding
-        cap_embedding = self.embedding(encoder_cap)  # n*maxL*dic
+        cap_embedding = self.embedding(encoder_cap)  # n*maxL*emb
 
         # initializa LSTM Cell
         mean_encoder_out = encoder_out.mean(dim=1)  # n*enc
@@ -107,7 +107,7 @@ class LSTMs(nn.Module):
             # run LSTM
             # ========================================
             # concate the captions and attentioned area
-            # n'*dic cat n'*enc = n' * (dic + enc)
+            # n'*emb cat n'*enc = n' * (emb + enc)
             xt = torch.cat(
                 [cap_embedding[:subatch_index, i, :], attentioned_out], dim=1)
             # run LSTMcell
@@ -121,7 +121,86 @@ class LSTMs(nn.Module):
 
         return predictions, encoder_cap, decoder_len, alphas, sorted_index
 
-        
+    def predict(self, encoder_out, word_map):
+        k = 3
+        # flatten image to size (batch_size, sumofpixcel, encoder_dim)
+        encoded_size = encoder_out.size(1)
+        encoder_out = encoder_out.view(
+            encoder_out.size(0), -1, encoder_out.size(-1))  # 1*(h*w)*enc
+
+        num_pixels = encoder_out.size(1)  # h*w
+        dic_size = self.dic_size  # dic
+
+        # sort data in length of caption (useful in the for loop of LSTMs to reduce time)
+        encoder_out = encoder_out.expend(k, num_pixels, encoder_out.size(2))  # k*(h*w)*enc
+
+        # initialize first word for k same image is <start>
+        prewords = torch.LongTensor([[word_map['<start>']]] * k).to(device) # k*1
+
+        # top k captions
+        topkcap = prewords # k*1
+
+        # top k score corresponding to top k captions
+        topkscore = torch.zeros(k, 1).to(device) # k*1
+
+        # top k alpha corresponding to top k captions
+        topkalpha = torch.ones(k, 1, encoded_size, encoded_size).to(device)
+
+        # log for top k
+        topkcap_all = list()
+        topkscore_all = list()
+        topkalpha_all = list()
+
+        step = 1
+        h = self.h(encoder_out.mean(dim=1))
+        c = self.c(encoder_out.mean(dim=1))
+
+        while True:
+            # embedding
+            embedding = self.embedding(topkcap) # s*1*emb
+            embedding = embedding.squeeze(1) # s*emb
+            attention_area, alpha = self.attention(encoder_out, h)
+            alpha = alpha.view(-1, encoded_size, encoded_size)
+            mask = self.fc_sig(h)
+            softmask = self.sigmoid(mask)
+            attentioned_out = softmask * attention_area
+            xt = torch.cat([embedding, attentioned_out], dim=1)
+            h, c = self.lstm(xt, (h,c))
+            preds = self.fc_dic(h)  # s*dic
+            preds = F.log_softmax(preds, dim=1)  # s*dic
+
+            preds = topkscore.expend_as(preds) + preds
+
+            if step == 1:
+                topkscore, topkcap = preds[0].topk(k, 0, True, True)
+            else:
+                topkscore, topkcap = preds.view(-1).topk(k, 0, True, True)
+
+            
+   
+        for i in range(max_length):
+            # the sub batch have length of caption greater than i
+            mask = self.fc_sig(h[:subatch_index])  # n'*enc
+            softmask = self.sigmoid(mask)  # n'*enc
+            attentioned_out = softmask * attention_area  # n'*enc
+            # ========================================
+
+            # run LSTM
+            # ========================================
+            # concate the captions and attentioned area
+            # n'*dic cat n'*enc = n' * (dic + enc)
+            xt = torch.cat(
+                [cap_embedding[:subatch_index, i, :], attentioned_out], dim=1)
+            # run LSTMcell
+            h, c = self.lstm(xt, (h[:subatch_index], c[:subatch_index]))
+            preds = self.fc_dic(self.dropout(h))  # n'*dic
+            # ========================================
+
+            #append result
+            predictions[:subatch_index, i, :] = preds  # n'*dic
+            alphas[:subatch_index, i, :] = alpha  # n'*(h*w)
+
+        return predictions, encoder_cap, decoder_len, alphas, sorted_index
 
 
     
