@@ -50,7 +50,7 @@ class LSTMs(nn.Module):
     def forward(self, encoder_out, encoder_cap, cap_len):
 
         # flatten image to size (batch_size, sumofpixcel, encoder_dim)
-        batbatch_size = encoder_out.size(0)
+        batch_size = encoder_out.size(0)
         encoder_out = encoder_out.view(
             encoder_out.size(0), -1, encoder_out.size(-1)) # n*(h*w)*enc
         
