@@ -130,7 +130,7 @@ class LSTMs(nn.Module):
             encoder_out.size(0), -1, encoder_out.size(-1))  # 1*(h*w)*enc
 
         num_pixels = encoder_out.size(1)  # h*w
-        dic_size = self.dic_size  # dic
+        dic_size = len(word_map)  # dic
 
         # sort data in length of caption (useful in the for loop of LSTMs to reduce time)
         encoder_out = encoder_out.expand(
