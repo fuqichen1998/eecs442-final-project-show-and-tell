@@ -133,16 +133,17 @@ class LSTMs(nn.Module):
         dic_size = self.dic_size  # dic
 
         # sort data in length of caption (useful in the for loop of LSTMs to reduce time)
-        encoder_out = encoder_out.expand(k, num_pixels, encoder_out.size(2))  # k*(h*w)*enc
+        encoder_out = encoder_out.expand(
+            k, num_pixels, encoder_out.size(2))  # k*(h*w)*enc
 
         # initialize first word for k same image is <start>
-        prewords = torch.LongTensor([[word_map['<start>']]] * k).to(device) # k*1
+        prewords = torch.LongTensor([[word_map['<start>']]] * k).to(device)  # k*1
 
         # top k captions
-        topkcap = prewords # k*1
+        topkcap = prewords  # k*1
 
         # top k score corresponding to top k captions
-        topkscore = torch.zeros(k, 1).to(device) # k*1
+        topkscore = torch.zeros(k, 1).to(device)  # k*1
 
         # top k alpha corresponding to top k captions
         topkalpha = torch.ones(k, 1, encoded_size, encoded_size).to(device)
@@ -165,21 +166,21 @@ class LSTMs(nn.Module):
             # =========================================
             # embedding
             embedding = self.embedding(prewords)  # s*1*emb
-            embedding = embedding.squeeze(1) # s*emb
+            embedding = embedding.squeeze(1)  # s*emb
             attention_area, alpha = self.attention(encoder_out, h)
             alpha = alpha.view(-1, encoded_size, encoded_size)
             mask = self.fc_sig(h)
             softmask = self.sigmoid(mask)
             attentioned_out = softmask * attention_area
             xt = torch.cat([embedding, attentioned_out], dim=1)
-            h, c = self.lstm(xt, (h,c))
+            h, c = self.lstm(xt, (h, c))
             preds = self.fc_dic(h)  # s*dic
             #=========================================
 
             # soft max for the scores of predicts
             preds = F.log_softmax(preds, dim=1)  # s*dic
 
-            # calculate all the scores that with previous predicted word 
+            # calculate all the scores that with previous predicted word
             # and the current word
             preds = topkscore.expand_as(preds) + preds  # s*dic
 
@@ -197,20 +198,20 @@ class LSTMs(nn.Module):
             nexcapinx = topkword % dic_size
 
             # append the word and alpha(attentiob mask) to the captions
-            topkcap = torch.cat([topkcap[precapinx], nexcapinx.unsqueeze(1)], dim=1) # s*(step + 1)
+            topkcap = torch.cat(
+                [topkcap[precapinx], nexcapinx.unsqueeze(1)], dim=1)  # s*(step + 1)
             topkalpha = torch.cat(
-                [topkalpha[precapinx], alpha[nexcapinx].unsqueeze(1)], dim=1)  # s*(step + 1)*-1*-1
+                [topkalpha[precapinx], alpha[precapinx].unsqueeze(1)], dim=1)  # s*(step + 1)*-1*-1
             h = h[precapinx]
             c = c[precapinx]
             encoder_out = encoder_out[precapinx]
-            
+
             # calculate the index of the captions which is not endding
             nonendinx = []
             for idx, nexcap in enumerate(nexcapinx):
-                print(nexcap)
-                if nexcap != word_map['<end>']:
+                if nexcap.cpu().numpy() != word_map['<end>']:
                     nonendinx.append(idx)
-            
+
             # calculate the index of the captions which is endded
             nonendset = set(nonendinx)
             allset = set(range(len(nexcapinx)))
@@ -223,11 +224,11 @@ class LSTMs(nn.Module):
                 topkalpha_all.extend(topkalpha[endinx].tolist())
                 topkscore_all.extend(topkscore[endinx])
                 k -= len(endinx)
-            
+
             # if already find k captions, break and to find the max
-            if k==0:
+            if k == 0:
                 break
-            
+
             # update all the list, state and so on
             topkcap = topkcap[nonendinx]
             topkalpha = topkalpha[nonendinx]
@@ -235,8 +236,7 @@ class LSTMs(nn.Module):
             h = h[nonendinx]
             c = c[nonendinx]
             encoder_out = encoder_out[nonendinx]
-            topkscore = topkscore[nonendinx].unsqueeze(1)
-            prewords = prewords[nonendinx].unsqueeze(1)
+            prewords = nexcapinx[nonendinx].unsqueeze(1)
 
             # if length too long, break
             if step > 30:
