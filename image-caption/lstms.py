@@ -157,7 +157,7 @@ class LSTMs(nn.Module):
 
         while True:
             # embedding
-            embedding = self.embedding(topkcap) # s*1*emb
+            embedding = self.embedding(prewords)  # s*1*emb
             embedding = embedding.squeeze(1) # s*emb
             attention_area, alpha = self.attention(encoder_out, h)
             alpha = alpha.view(-1, encoded_size, encoded_size)
@@ -169,38 +169,55 @@ class LSTMs(nn.Module):
             preds = self.fc_dic(h)  # s*dic
             preds = F.log_softmax(preds, dim=1)  # s*dic
 
-            preds = topkscore.expend_as(preds) + preds
+            preds = topkscore.expend_as(preds) + preds  # s*dic
 
             if step == 1:
                 topkscore, topkcap = preds[0].topk(k, 0, True, True)
             else:
                 topkscore, topkcap = preds.view(-1).topk(k, 0, True, True)
 
+            precapinx = topkcap / dic_size
+            nexcapinx = topkcap % dic_size
+
+            topkcap = torch.cat([topkcap[precapinx], nexcapinx.unsqueeze(1)], dim=1) # s*(step + 1)
+            topkalpha = torch.cat(
+                [topkalpha[precapinx], alpha[nexcapinx].unsqueeze(1)], dim=1)  # s*(step + 1)*-1*-1
+            h = h[precapinx]
+            c = c[precapinx]
+            encoder_out = encoder_out[precapinx]
+
+            nonendinx = []
+            for idx, nexcap in enumerate(nexcapinx):
+                if nexcap != word_map['<end>']:
+                    nonendinx.append(idx)
+            nonendset = set(nonendinx)
+            allset = set(range(len(nexcapinx)))
+            nonendset = set(nonendinx)
+            endinx = list(allset - nonendset)
+
+            if len(endinx) > 0:
+                topkcap_all.extend(topkcap[endinx].tolist())
+                topkalpha_all.extend(topkalpha[endinx].tolist())
+                topkscore_all.extend(topkscore[endinx])
+                k -= len(endinx)
             
-   
-        for i in range(max_length):
-            # the sub batch have length of caption greater than i
-            mask = self.fc_sig(h[:subatch_index])  # n'*enc
-            softmask = self.sigmoid(mask)  # n'*enc
-            attentioned_out = softmask * attention_area  # n'*enc
-            # ========================================
+            if k==0:
+                break
+            
+            topkcap = topkcap[nonendinx]
+            topkalpha = topkalpha[nonendinx]
+            topkscore = topkscore[nonendinx].unsqueeze(1)
+            h = h[nonendinx]
+            c = c[nonendinx]
+            encoder_out = encoder_out[nonendinx]
+            topkscore = topkscore[nonendinx].unsqueeze(1)
+            prewords = prewords[nonendinx].unsqueeze(1)
 
-            # run LSTM
-            # ========================================
-            # concate the captions and attentioned area
-            # n'*dic cat n'*enc = n' * (dic + enc)
-            xt = torch.cat(
-                [cap_embedding[:subatch_index, i, :], attentioned_out], dim=1)
-            # run LSTMcell
-            h, c = self.lstm(xt, (h[:subatch_index], c[:subatch_index]))
-            preds = self.fc_dic(self.dropout(h))  # n'*dic
-            # ========================================
+            if step > 30:
+                break
+            step += 1
 
-            #append result
-            predictions[:subatch_index, i, :] = preds  # n'*dic
-            alphas[:subatch_index, i, :] = alpha  # n'*(h*w)
-
-        return predictions, encoder_cap, decoder_len, alphas, sorted_index
-
-
-    
+        maxinx = topkscore_all.index(max(topkscore_all))
+        bestcap = topkcap_all[maxinx]
+        bestalpha = topkalpha_all[maxinx]
+        return bestcap, bestalpha
