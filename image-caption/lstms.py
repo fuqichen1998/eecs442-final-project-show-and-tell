@@ -186,14 +186,14 @@ class LSTMs(nn.Module):
             # thus no need to look at all
             # otherwise, choose the top k in the map
             if step == 1:
-                topkscore, topkcap = preds[0].topk(k, 0, True, True)
+                topkscore, topkword = preds[0].topk(k, 0, True, True)
             else:
-                topkscore, topkcap = preds.view(-1).topk(k, 0, True, True)
+                topkscore, topkword = preds.view(-1).topk(k, 0, True, True)
 
             # get the index among the k captions
-            precapinx = topkcap / dic_size
+            precapinx = topkword / dic_size
             # get the ibdex for the next word for the captions
-            nexcapinx = topkcap % dic_size
+            nexcapinx = topkword % dic_size
 
             # append the word and alpha(attentiob mask) to the captions
             topkcap = torch.cat([topkcap[precapinx], nexcapinx.unsqueeze(1)], dim=1) # s*(step + 1)
