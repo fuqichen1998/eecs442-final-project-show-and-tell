@@ -206,6 +206,7 @@ class LSTMs(nn.Module):
             # calculate the index of the captions which is not endding
             nonendinx = []
             for idx, nexcap in enumerate(nexcapinx):
+                print(nexcap)
                 if nexcap != word_map['<end>']:
                     nonendinx.append(idx)
             
