@@ -6,6 +6,7 @@ from nltk.translate.bleu_score import corpus_bleu
 from dataset import *
 from torch import nn
 from helper import *
+import numpy as np
 import random
 import imageio
 from torch.nn.utils.rnn import pack_padded_sequence
@@ -106,11 +107,13 @@ def decode_caption(encoded_words, img):
         decoded_sentence.append(reversed_word_dict[encoded_word])
     plt.text(0, 1, "".join(decoded_sentence))
     plt.imshow(img)
-    plt.show()
+    # plt.axis('off')
+    plt.imsave(output_path, )
+    # plt.show()
     return decoded_sentence
 
 def visualize_cap_with_attention(encoded_words, img, alphas):
-    decoded_sentence = decode_caption(encoded_words)
+    decoded_sentence = decode_caption(encoded_words, img)
     for idx, seq in enumerate(decoded_sentence):
         plt.text(0, 1, decoded_sentence[idx])
         plt.imshow(img)
@@ -119,6 +122,7 @@ def visualize_cap_with_attention(encoded_words, img, alphas):
         # https://matplotlib.org/gallery/color/colormap_reference.html
         plt.set_cmap(cm.Reds)
         plt.imshow(alpha_vector, alpha=alpha_value)
+        # plt.axis('off')
         plt.show()
 
 
@@ -136,9 +140,14 @@ if __name__ == '__main__':
         if i / 5 >= num_imgs:
             break
         # already resized and permuted in dataset
-        encoded_cap = search_caption(image.to(device))
-        visualize_cap_with_attention(encoded_cap)
-        decoded_sentence = decode_caption(encoded_cap, image.numpy()[0].transpose(1, 2, 0))
+        # encoded_cap = search_caption(image.to(device))
+        encoded_cap = (np.random.rand(30) * 1000).astype(int)
+        # dimension of image to 1 x W x H x 3
+        img_numpy = image.numpy()[0].transpose(1, 2, 0)
+        img_numpy = img_numpy.astype(np.uint8)
+        alphas = np.random.rand(30, img_numpy.shape[1], img_numpy.shape[2])
+        visualize_cap_with_attention(encoded_cap, img_numpy, alphas=alphas)
+        # decoded_sentence = decode_caption(encoded_cap, image.numpy()[0].transpose(1, 2, 0))
         # imageio.imwrite(os.path.join(output_path, str(i // num_imgs) + ".jpg"), image.numpy()[0].transpose(1, 2, 0))
     # Write all decoded caps into a text file
 
