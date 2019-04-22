@@ -112,11 +112,11 @@ def decode_caption(encoded_words, img):
     # plt.show()
     return decoded_sentence
 
-def visualize_cap_with_attention(encoded_words, img, alphas):
+def visualize_cap_with_attention(encoded_words, imgshow, img, alphas):
     decoded_sentence = decode_caption(encoded_words, img)
     for idx, seq in enumerate(decoded_sentence):
         plt.text(0, 1, decoded_sentence[idx])
-        plt.imshow(img)
+        plt.imshow(imgshow)
         alpha_vector = alphas[idx, :]
         alpha_value = 0.5 if idx == 0 else 0
         # https://matplotlib.org/gallery/color/colormap_reference.html
@@ -132,21 +132,26 @@ if __name__ == '__main__':
                                      std=[0.229, 0.224, 0.225])
     # validate(normalize)
     test_loader = torch.utils.data.DataLoader(CustomDataset("./preprocess_out", "flickr8k", 'TEST',
-                                                            transform=transforms.Compose([normalize])),
+                                                            transform=None),
                                               batch_size=1, shuffle=False, num_workers=1, pin_memory=True)
     for i, (image, caps, caplens, allcaps) in enumerate(test_loader):
         if i % 5 != 0:
             continue
         if i / 5 >= num_imgs:
             break
+        imgtemp = image
+        imgnp = imgtemp.numpy()[0].transpose(1, 2, 0)
         # already resized and permuted in dataset
         # encoded_cap = search_caption(image.to(device))
+        transforms = transforms.Compose([normalize])
+        image = transforms(image)
         encoded_cap = (np.random.rand(30) * 1000).astype(int)
         # dimension of image to 1 x W x H x 3
         img_numpy = image.numpy()[0].transpose(1, 2, 0)
-        img_numpy = img_numpy.astype(np.uint8)
+        #img_numpy = img_numpy.astype(np.uint8)
         alphas = np.random.rand(30, img_numpy.shape[1], img_numpy.shape[2])
-        visualize_cap_with_attention(encoded_cap, img_numpy, alphas=alphas)
+        #imgnp passed in
+        visualize_cap_with_attention(encoded_cap,imgnp,img_numpy,alphas=alphas)
         # decoded_sentence = decode_caption(encoded_cap, image.numpy()[0].transpose(1, 2, 0))
         # imageio.imwrite(os.path.join(output_path, str(i // num_imgs) + ".jpg"), image.numpy()[0].transpose(1, 2, 0))
     # Write all decoded caps into a text file
