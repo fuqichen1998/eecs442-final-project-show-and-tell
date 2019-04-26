@@ -16,7 +16,7 @@ import torch.nn.functional as F
 ## Parameters ##
 output_path = "./test_caption_out"
 dataset = "flickr8k"
-num_imgs = 10
+num_imgs = 30
 check_point_name = "best_checkpoint_flickr8k.pth.tar"
 dictionary_json_path = os.path.join("./preprocess_out", 'DICTIONARY_WORDS_' + dataset + '.json')
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -24,135 +24,213 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 ## Load checkpoint ##
 encoder, decoder, decoder_opt, last_epoch, best_bleu_score = load_checkpoint(check_point_name)
 
-word_dict = None
+word_map = None
 with open(dictionary_json_path, 'r') as file:
-    word_dict = json.load(file)
-dict_len = len(word_dict)
-
+    word_map = json.load(file)
+dict_len = len(word_map)
+# word_dict.to(device)
 reversed_word_dict = {}
-for k, v in word_dict.items():
+for k, v in word_map.items():
     reversed_word_dict[v] = k
 
 
-def search_caption(img_tensor, use_beam_search=False, beam_size=5):
-    encode = encoder(img_tensor)  # 1*14*14*512
-    encode = encode.view(1, encode.size(1) * encode.size(2), 512)  # encode channel = 512 result = 1*(14*14)*512
-    out = encode.expand(beam_size, encode.size(1), 512)
-    return
+# reversed_word_dict.to(device)
+
+def search_caption(img_tensor):
+    encoder_out = encoder(img_tensor)  # 1*14*14*512
+    k = 8
+    # flatten image to size (batch_size, sumofpixcel, encoder_dim)
+    encoded_size = encoder_out.size(1)
+    encoder_out = encoder_out.view(
+        encoder_out.size(0), -1, encoder_out.size(-1))  # 1*(h*w)*enc
+
+    num_pixels = encoder_out.size(1)  # h*w
+    dic_size = decoder.dic_size  # dic
+
+    # sort data in length of caption (useful in the for loop of LSTMs to reduce time)
+    encoder_out = encoder_out.expand(k, num_pixels, encoder_out.size(2))  # k*(h*w)*enc
+
+    # initialize first word for k same image is <start>
+    prewords = torch.LongTensor([[word_map['<start>']]] * k).to(device)  # k*1
+
+    # top k captions
+    topkcap = prewords  # k*1
+
+    # top k score corresponding to top k captions
+    topkscore = torch.zeros(k, 1).to(device)  # k*1
+
+    # top k alpha corresponding to top k captions
+    topkalpha = torch.ones(k, 1, encoded_size, encoded_size).to(device)
+
+    # log for top k
+    topkcap_all = list()
+    topkscore_all = list()
+    topkalpha_all = list()
+
+    # the length of word we are going to predict
+    step = 1
+
+    # initialize the h and c based on encodered out
+    h = decoder.h(encoder_out.mean(dim=1))
+    c = decoder.c(encoder_out.mean(dim=1))
+
+    # while we have not get k captions
+    while True:
+        # SAME as that in the forward
+        # =========================================
+        # embedding
+        embedding = decoder.embedding(prewords)  # s*1*emb
+        embedding = embedding.squeeze(1)  # s*emb
+        attention_area, alpha = decoder.attention(encoder_out, h)
+        alpha = alpha.view(-1, encoded_size, encoded_size)
+        mask = decoder.fc_sig(h)
+        softmask = decoder.sigmoid(mask)
+        attentioned_out = softmask * attention_area
+        xt = torch.cat([embedding, attentioned_out], dim=1)
+        h, c = decoder.lstm(xt, (h, c))
+        preds = decoder.fc_dic(h)  # s*dic
+        # =========================================
+
+        # soft max for the scores of predicts
+        preds = F.log_softmax(preds, dim=1)  # s*dic
+
+        # calculate all the scores that with previous predicted word
+        # and the current word
+        preds = topkscore.expand_as(preds) + preds  # s*dic
+
+        # in the first, all the current words are the same("<begin>")
+        # thus no need to look at all
+        # otherwise, choose the top k in the map
+        if step == 1:
+            topkscore, topkword = preds[0].topk(k, 0, True, True)
+        else:
+            topkscore, topkword = preds.view(-1).topk(k, 0, True, True)
+
+        # get the index among the k captions
+        precapinx = topkword / dic_size
+        # get the ibdex for the next word for the captions
+        nexcapinx = topkword % dic_size
+
+        # append the word and alpha(attentiob mask) to the captions
+        topkcap = torch.cat([topkcap[precapinx], nexcapinx.unsqueeze(1)], dim=1)  # s*(step + 1)
+        topkalpha = torch.cat(
+            [topkalpha[precapinx], alpha[precapinx].unsqueeze(1)], dim=1)  # s*(step + 1)*-1*-1
+        h = h[precapinx]
+        c = c[precapinx]
+        encoder_out = encoder_out[precapinx]
+
+        # calculate the index of the captions which is not endding
+        nonendinx = []
+        for idx, nexcap in enumerate(nexcapinx):
+            if nexcap.cpu().numpy() != word_map['<end>']:
+                nonendinx.append(idx)
+
+        # calculate the index of the captions which is endded
+        nonendset = set(nonendinx)
+        allset = set(range(len(nexcapinx)))
+        nonendset = set(nonendinx)
+        endinx = list(allset - nonendset)
+
+        # appended the ended captions to the result and decrement k
+        if len(endinx) > 0:
+            topkcap_all.extend(topkcap[endinx].tolist())
+            topkalpha_all.extend(topkalpha[endinx].tolist())
+            topkscore_all.extend(topkscore[endinx])
+            k -= len(endinx)
+
+        # if already find k captions, break and to find the max
+        if k == 0:
+            #             print("k=0")
+            break
+
+        # update all the list, state and so on
+        topkcap = topkcap[nonendinx]
+        topkalpha = topkalpha[nonendinx]
+        topkscore = topkscore[nonendinx].unsqueeze(1)
+        h = h[nonendinx]
+        c = c[nonendinx]
+        encoder_out = encoder_out[nonendinx]
+        prewords = nexcapinx[nonendinx].unsqueeze(1)
+
+        # if length too long, break
+        if step > 30:
+            #           print(">30")
+            break
+        step += 1
+
+    # find the max index based on the scores
+    # return the best captions and its corresponding alpha by
+    # max index
+    #     print(len(topkscore_all))
+    maxinx = topkscore_all.index(max(topkscore_all))
+    bestcap = topkcap_all[maxinx]
+    bestalpha = topkalpha_all[maxinx]
+    return bestcap, bestalpha
 
 
-def validate(normalize):
-    alpha_c = 1.  # regularization parameter for 'doubly stochastic attention'
-    val_loader = torch.utils.data.DataLoader(CustomDataset("./preprocess_out", "flickr8k", 'VAL',
-                                                           transform=transforms.Compose([normalize])),
-                                             batch_size=48, shuffle=True, num_workers=1, pin_memory=True)
-    # validate and return score
-    val_loss_all = 0
-    references = []
-    hypotheses = []
-    #######################################
-    # TODO: check if with torch.no_grad(): necessary
-    decoder.eval()
-    with torch.no_grad():
-        for i, (img, caption, cap_len, all_captions) in enumerate(val_loader):
-            # use GPU if possible
-            img = img.to(device)
-            caption = caption.to(device)
-            cap_len = cap_len.to(device)
-
-            # forward
-            encoded = encoder(img)
-            preds, sorted_caps, decoded_len, alphas, sorted_index = decoder(
-                encoded, caption, cap_len)
-
-            # ignore the begin word
-            trues = sorted_caps[:, 1:]
-            preds2 = preds.clone()
-            # pack and pad
-            preds, _ = pack_padded_sequence(preds, decoded_len, batch_first=True)
-            trues, _ = pack_padded_sequence(trues, decoded_len, batch_first=True)
-
-            # calculate loss
-            criterion = nn.CrossEntropyLoss().to(device)
-            loss = criterion(preds, trues)
-            loss += alpha_c * (1. - alphas.sum(dim=1) ** 2).mean()
-            val_loss_all += loss
-
-            # TODO: print performance
-            all_captions = all_captions[sorted_index]
-            for j in range(all_captions.shape[0]):
-                img_caps = all_captions[j].tolist()
-                img_captions = list(
-                    map(lambda c: [w for w in c if w not in {word_dict['<start>'], word_dict['<pad>']}],
-                        img_caps))  # remove <start> and pads
-                references.append(img_captions)
-            _, predmax = torch.max(preds2, dim=2)
-            predmax = predmax.tolist()
-            temp_preds = list()
-            for j, p in enumerate(predmax):
-                temp_preds.append(
-                    predmax[j][:decoded_len[j]])  # remove pads
-            predmax = temp_preds
-            hypotheses.extend(predmax)
-            assert len(references) == len(hypotheses)
-
-        print("Validation Loss All: ", val_loss_all)
-        bleu4 = corpus_bleu(references, hypotheses)
-        print("bleu4 score: ", bleu4)
-
-
-def decode_caption(encoded_words, img):
-    decoded_sentence = []
-    for encoded_word in encoded_words:
-        decoded_sentence.append(reversed_word_dict[encoded_word])
-    plt.text(0, 1, "".join(decoded_sentence))
-    plt.imshow(img)
-    # plt.axis('off')
-    plt.imsave(output_path, )
-    # plt.show()
-    return decoded_sentence
-
-def visualize_cap_with_attention(encoded_words, imgshow, img, alphas):
-    decoded_sentence = decode_caption(encoded_words, img)
-    for idx, seq in enumerate(decoded_sentence):
-        plt.text(0, 1, decoded_sentence[idx])
-        plt.imshow(imgshow)
+def visualize_attention_mechanism(decoded_sentence, img, alphas):
+    f, axarr = plt.subplots(len(decoded_sentence) // 3 + 1, 3, figsize=(15, 5))
+    f.suptitle('Attention Mechanism Visualization')
+    for idx, word in enumerate(decoded_sentence):
+        row = idx // 3
+        col = idx % 3
+        axarr[row, col].text(1, -15, decoded_sentence[idx])
+        axarr[row, col].imshow(img)
         alpha_vector = alphas[idx, :]
-        alpha_value = 0.5 if idx == 0 else 0
+        alpha_value = 0.3 if idx == 0 else 0
         # https://matplotlib.org/gallery/color/colormap_reference.html
-        plt.set_cmap(cm.Reds)
-        plt.imshow(alpha_vector, alpha=alpha_value)
+        axarr[row, col].set_cmap(cm.Reds)
+        axarr[row, col].imshow(alpha_vector, alpha=alpha_value)
         # plt.axis('off')
-        plt.show()
+    plt.savefig(output_path + "/attention_vis.jpg")
 
 
 if __name__ == '__main__':
+    #     print(word_map['<start>'])
+    #     print(word_map['<end>'])
     random.seed(442)
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
     # validate(normalize)
     test_loader = torch.utils.data.DataLoader(CustomDataset("./preprocess_out", "flickr8k", 'TEST',
-                                                            transform=None),
-                                              batch_size=1, shuffle=False, num_workers=1, pin_memory=True)
-    for i, (image, caps, caplens, allcaps) in enumerate(test_loader):
-        if i % 5 != 0:
-            continue
-        if i / 5 >= num_imgs:
+                                                            transform=transforms.Compose([normalize])),
+                                              batch_size=1, shuffle=True, num_workers=1, pin_memory=True)
+    f, axarr = plt.subplots(10, 3, figsize=(25, 50))
+    #     plt.axis('image')
+    f.suptitle('Results: Generated Captions')
+    for i, (image, raw_img, caps, caplens, allcaps) in enumerate(test_loader):
+        #         if i % 5 != 0:
+        #             continue
+        if i == num_imgs:
             break
-        imgtemp = image
-        imgnp = imgtemp.numpy()[0].transpose(1, 2, 0)
         # already resized and permuted in dataset
-        # encoded_cap = search_caption(image.to(device))
-        transforms = transforms.Compose([normalize])
-        image = transforms(image)
-        encoded_cap = (np.random.rand(30) * 1000).astype(int)
-        # dimension of image to 1 x W x H x 3
-        img_numpy = image.numpy()[0].transpose(1, 2, 0)
-        #img_numpy = img_numpy.astype(np.uint8)
-        alphas = np.random.rand(30, img_numpy.shape[1], img_numpy.shape[2])
-        #imgnp passed in
-        visualize_cap_with_attention(encoded_cap,imgnp,img_numpy,alphas=alphas)
-        # decoded_sentence = decode_caption(encoded_cap, image.numpy()[0].transpose(1, 2, 0))
-        # imageio.imwrite(os.path.join(output_path, str(i // num_imgs) + ".jpg"), image.numpy()[0].transpose(1, 2, 0))
-    # Write all decoded caps into a text file
+        bestcap, bestalpha = search_caption(image.to(device))
+        #         print(bestcap)
+        decoded_sentence = []
+        for encoded_word in bestcap:
+            decoded_sentence.append(reversed_word_dict[encoded_word])
+        caption = " ".join(decoded_sentence)
 
+        # dimension of image to 1 x W x H x 3
+        img_np = raw_img.numpy()[0].transpose(1, 2, 0)
+
+        if i == 0:
+            visualize_attention_mechanism(decoded_sentence, img_np, bestalpha)
+
+        row = i // 3
+        col = i % 3
+        axarr[row, col].imshow(img_np)
+        axarr[row, col].text(1, -15, caption, verticalalignment='center', fontsize=12, wrap=True,
+                             bbox=dict(facecolor='red', alpha=0.4))
+        #         axarr[i].imshow(img_np)
+        #         axarr[i].text(1, -15, caption, verticalalignment='center', fontsize=14, bbox=dict(facecolor='red', alpha=0.4))
+
+        #         plt.figure()
+        #         plt.text(1, -15, caption, verticalalignment='center', fontsize=14, bbox=dict(facecolor='red', alpha=0.4))
+        #         plt.imshow(img_np)
+        #         # plt.axis('off')
+        #         plt.savefig(output_path + "/{}_caption.jpg".format(i))
+        imageio.imwrite(os.path.join(output_path, str(i) + "_raw.jpg"), img_np)
+        imageio.imwrite(os.path.join(output_path, str(i) + ".jpg"), image.numpy()[0].transpose(1, 2, 0))
+    # Write all decoded caps into a text file
+    plt.savefig(output_path + "/generated_captions.jpg")

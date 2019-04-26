@@ -36,7 +36,7 @@ class CustomDataset(Dataset):
         # NOTE: Each image has caps_per_img number of captions
         img = torch.FloatTensor(self.images_data[img_idx] / 255.0)
         if self.transform:
-            img = self.transform(img)
+            img_normalized = self.transform(img)
         caption = torch.LongTensor(self.captions_indexed[i])
         cap_len = torch.LongTensor([self.cap_len[i]])
 
@@ -44,10 +44,14 @@ class CustomDataset(Dataset):
         # we need to also return all captions for this image for calculating scores
         if self.split is 'TRAIN':
             return img, caption, cap_len
-        else:
+        elif self.split is 'VAL':
             all_captions = torch.LongTensor(self.captions_indexed[(img_idx * self.caps_per_img):
                                                                   (img_idx * self.caps_per_img + self.caps_per_img)])
             return img, caption, cap_len, all_captions
+        else:
+            all_captions = torch.LongTensor(self.captions_indexed[(img_idx * self.caps_per_img):
+                                                                  (img_idx * self.caps_per_img + self.caps_per_img)])
+            return img_normalized, img, caption, cap_len, all_captions
 
 
 # if __name__== "__main__":
