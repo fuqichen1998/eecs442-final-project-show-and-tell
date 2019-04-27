@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import torchvision.transforms as transforms
 from nltk.translate.bleu_score import corpus_bleu
+import skimage.transform
+from PIL import Image
 from dataset import *
 from torch import nn
 from helper import *
@@ -15,14 +17,17 @@ import torch.nn.functional as F
 
 ## Parameters ##
 output_path = "./test_caption_out"
+attention_output_path = "./test_attention_out"
 dataset = "flickr8k"
-num_imgs = 30
+num_imgs = 40
 check_point_name = "best_checkpoint_flickr8k.pth.tar"
-dictionary_json_path = os.path.join("./preprocess_out", 'DICTIONARY_WORDS_' + dataset + '.json')
+dictionary_json_path = os.path.join(
+    "./preprocess_out", 'DICTIONARY_WORDS_' + dataset + '.json')
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 ## Load checkpoint ##
-encoder, decoder, decoder_opt, last_epoch, best_bleu_score = load_checkpoint(check_point_name)
+encoder, decoder, decoder_opt, last_epoch, best_bleu_score = load_checkpoint(
+    check_point_name)
 
 word_map = None
 with open(dictionary_json_path, 'r') as file:
@@ -48,7 +53,8 @@ def search_caption(img_tensor):
     dic_size = decoder.dic_size  # dic
 
     # sort data in length of caption (useful in the for loop of LSTMs to reduce time)
-    encoder_out = encoder_out.expand(k, num_pixels, encoder_out.size(2))  # k*(h*w)*enc
+    encoder_out = encoder_out.expand(
+        k, num_pixels, encoder_out.size(2))  # k*(h*w)*enc
 
     # initialize first word for k same image is <start>
     prewords = torch.LongTensor([[word_map['<start>']]] * k).to(device)  # k*1
@@ -112,7 +118,8 @@ def search_caption(img_tensor):
         nexcapinx = topkword % dic_size
 
         # append the word and alpha(attentiob mask) to the captions
-        topkcap = torch.cat([topkcap[precapinx], nexcapinx.unsqueeze(1)], dim=1)  # s*(step + 1)
+        topkcap = torch.cat(
+            [topkcap[precapinx], nexcapinx.unsqueeze(1)], dim=1)  # s*(step + 1)
         topkalpha = torch.cat(
             [topkalpha[precapinx], alpha[precapinx].unsqueeze(1)], dim=1)  # s*(step + 1)*-1*-1
         h = h[precapinx]
@@ -168,23 +175,6 @@ def search_caption(img_tensor):
     return bestcap, bestalpha
 
 
-def visualize_attention_mechanism(decoded_sentence, img, alphas):
-    f, axarr = plt.subplots(len(decoded_sentence) // 3 + 1, 3, figsize=(15, 5))
-    f.suptitle('Attention Mechanism Visualization')
-    for idx, word in enumerate(decoded_sentence):
-        row = idx // 3
-        col = idx % 3
-        axarr[row, col].text(1, -15, decoded_sentence[idx])
-        axarr[row, col].imshow(img)
-        alpha_vector = alphas[idx, :]
-        alpha_value = 0.3 if idx == 0 else 0
-        # https://matplotlib.org/gallery/color/colormap_reference.html
-        axarr[row, col].set_cmap(cm.Reds)
-        axarr[row, col].imshow(alpha_vector, alpha=alpha_value)
-        # plt.axis('off')
-    plt.savefig(output_path + "/attention_vis.jpg")
-
-
 if __name__ == '__main__':
     #     print(word_map['<start>'])
     #     print(word_map['<end>'])
@@ -197,7 +187,51 @@ if __name__ == '__main__':
                                               batch_size=1, shuffle=True, num_workers=1, pin_memory=True)
     f, axarr = plt.subplots(10, 3, figsize=(25, 50))
     #     plt.axis('image')
-    f.suptitle('Results: Generated Captions')
+
+    # Plot captions
+    # ============================================================================================================
+    # f.suptitle('Results: Generated Captions')
+    # for i, (image, raw_img, caps, caplens, allcaps) in enumerate(test_loader):
+    #     #         if i % 5 != 0:
+    #     #             continue
+    #     if i == num_imgs:
+    #         break
+    #     # already resized and permuted in dataset
+    #     bestcap, bestalpha = search_caption(image.to(device))
+    #     #         print(bestcap)
+    #     decoded_sentence = []
+    #     for encoded_word in bestcap:
+    #         decoded_sentence.append(reversed_word_dict[encoded_word])
+    #     caption = " ".join(decoded_sentence)
+
+    #     # dimension of image to 1 x W x H x 3
+    #     img_np = raw_img.numpy()[0].transpose(1, 2, 0)
+
+    #     if i == 0:
+    #         visualize_attention_mechanism(decoded_sentence, img_np, bestalpha)
+
+    #     row = i // 3
+    #     col = i % 3
+    #     axarr[row, col].imshow(img_np)
+    #     axarr[row, col].text(1, -15, caption, verticalalignment='center', fontsize=12, wrap=True,
+    #                          bbox=dict(facecolor='red', alpha=0.4))
+    #     #         axarr[i].imshow(img_np)
+    #     #         axarr[i].text(1, -15, caption, verticalalignment='center', fontsize=14, bbox=dict(facecolor='red', alpha=0.4))
+
+    #     #         plt.figure()
+    #     #         plt.text(1, -15, caption, verticalalignment='center', fontsize=14, bbox=dict(facecolor='red', alpha=0.4))
+    #     #         plt.imshow(img_np)
+    #     #         # plt.axis('off')
+    #     #         plt.savefig(output_path + "/{}_caption.jpg".format(i))
+    #     imageio.imwrite(os.path.join(output_path, str(i) + "_raw.jpg"), img_np)
+    #     imageio.imwrite(os.path.join(output_path, str(i) + ".jpg"), image.numpy()[0].transpose(1, 2, 0))
+    # Write all decoded caps into a text file
+    # plt.savefig(output_path + "/generated_captions.jpg")
+    # ============================================================================================================
+
+    # Plot attention
+    # ============================================================================================================
+    f.suptitle('Results: Generated attention')
     for i, (image, raw_img, caps, caplens, allcaps) in enumerate(test_loader):
         #         if i % 5 != 0:
         #             continue
@@ -205,32 +239,33 @@ if __name__ == '__main__':
             break
         # already resized and permuted in dataset
         bestcap, bestalpha = search_caption(image.to(device))
+        bestalpha = torch.FloatTensor(bestalpha)
+        image = image[0].numpy().transpose(1, 2, 0)
+#         image = image.resize([14 * 24, 14 * 24], Image.LANCZOS)
         #         print(bestcap)
         decoded_sentence = []
         for encoded_word in bestcap:
             decoded_sentence.append(reversed_word_dict[encoded_word])
-        caption = " ".join(decoded_sentence)
 
-        # dimension of image to 1 x W x H x 3
-        img_np = raw_img.numpy()[0].transpose(1, 2, 0)
+        for w in range(len(decoded_sentence)):
+            print(w)
+            print(decoded_sentence[w])
+            plt.subplot(np.ceil(len(decoded_sentence) / 5.), 5, w + 1)
 
-        if i == 0:
-            visualize_attention_mechanism(decoded_sentence, img_np, bestalpha)
-
-        row = i // 3
-        col = i % 3
-        axarr[row, col].imshow(img_np)
-        axarr[row, col].text(1, -15, caption, verticalalignment='center', fontsize=12, wrap=True,
-                             bbox=dict(facecolor='red', alpha=0.4))
-        #         axarr[i].imshow(img_np)
-        #         axarr[i].text(1, -15, caption, verticalalignment='center', fontsize=14, bbox=dict(facecolor='red', alpha=0.4))
-
-        #         plt.figure()
-        #         plt.text(1, -15, caption, verticalalignment='center', fontsize=14, bbox=dict(facecolor='red', alpha=0.4))
-        #         plt.imshow(img_np)
-        #         # plt.axis('off')
-        #         plt.savefig(output_path + "/{}_caption.jpg".format(i))
-        imageio.imwrite(os.path.join(output_path, str(i) + "_raw.jpg"), img_np)
-        imageio.imwrite(os.path.join(output_path, str(i) + ".jpg"), image.numpy()[0].transpose(1, 2, 0))
-    # Write all decoded caps into a text file
-    plt.savefig(output_path + "/generated_captions.jpg")
+            plt.text(0, 1, '%s' % (decoded_sentence[w]), color='black',
+                     backgroundcolor='white', fontsize=12)
+            plt.imshow(image)
+            current_alpha = bestalpha[w, :]
+            alpha = skimage.transform.resize(
+                current_alpha.numpy(), [256, 256])
+            plt.imshow(alpha, alpha=0)
+            if w == 0:
+                plt.imshow(alpha, alpha=0)
+            else:
+                plt.imshow(alpha, alpha=0.8)
+            plt.set_cmap(cm.Greys_r)
+            plt.axis('off')
+        plt.savefig(attention_output_path +
+                    "/generated_attention_" + str(i) + ".jpg")
+        plt.clf()
+    # ============================================================================================================
