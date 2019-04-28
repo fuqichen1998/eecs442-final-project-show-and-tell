@@ -224,25 +224,27 @@ if __name__ == '__main__':
     # ============================================================================================================
     f.suptitle('Results: Generated attention')
     for i, (image, raw_img, caps, caplens, allcaps) in enumerate(test_loader):
-        #         if i % 5 != 0:
-        #             continue
         if i == num_imgs:
             break
         # already resized and permuted in dataset
         bestcap, bestalpha = search_caption(image.to(device))
+        
+        # to numpy
         bestalpha = torch.FloatTensor(bestalpha)
         image = image[0].numpy().transpose(1, 2, 0)
-        #         image = image.resize([14 * 24, 14 * 24], Image.LANCZOS)
-        #         print(bestcap)
+        
+        # get the caption sequence
         decoded_sentence = []
         for encoded_word in bestcap:
             decoded_sentence.append(reversed_word_dict[encoded_word])
 
+        # for every word, plot masked image
         for w in range(len(decoded_sentence)):
-            print(w)
-            print(decoded_sentence[w])
-            plt.subplot(np.ceil(len(decoded_sentence) / 5.), 5, w + 1)
 
+            # print(w)
+            # print(decoded_sentence[w])
+            plt.subplot(np.ceil(len(decoded_sentence) / 5.), 5, w + 1)
+            # add text
             plt.text(0, 1, '%s' % (decoded_sentence[w]), color='black',
                      backgroundcolor='white', fontsize=12)
             plt.imshow(raw_img[0].numpy().transpose(1, 2, 0))
@@ -250,6 +252,7 @@ if __name__ == '__main__':
             alpha = skimage.transform.resize(
                 current_alpha.numpy(), [256, 256])
             plt.imshow(alpha, alpha=0)
+            # for the beginning, the mask is none for the word "<begin>"
             if w == 0:
                 plt.imshow(alpha, alpha=0)
             else:
