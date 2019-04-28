@@ -49,16 +49,27 @@ https://stanford.edu/~shervine/blog/pytorch-how-to-generate-data-parallel
 
 
 ## CNN Network
-TODO
+The encoder needs to extract image features of various sizes and encodes them into vector space which can be fed to RNN in a later stage. VGG-16 and ResNet is commonly recommened as image encoders. We chose to modify the pre-trained VGG-16 model provided by PyTorch library.
+
+In this task, CNN is used to encode features instead of classify images. As a result, we removed the fully connected layers and the max pool layers at the end of the network. Under this new construction, the input image matrix has dimension N x 3 x 256 x 256, and the output has dimension N x 14 x 14 x 512. Furthermore, in order to support input images with various sizes, we added an adaptive 2d layer to our CNN architecture.
+
+In our image captioning architecture, we disabled gradient to reduce computational costs. With fine-tuning, we might obtain a better overall performance.
 
 
 ## RNN (LSTM) Network
-TODO
+The decoder needs to generate image captions word by word using a Recurrent Neural Network - LSTMs which is able to sequentially generate words. The input for the decoder is the encoded image feature vectors from CNN and the encoded image captions produced in data preprocessing stage. 
 
+The decoder consists of an attention module designed and implemented by ourselves, an LSTM cell module and four fully connected layers provided by PyTorch library for the initialization of the states of LSTMcell and word dictionary.
+
+When receiving the encoded images and captions,  we first sort the encoded images and captions by encoded key length of images in descending order. We intend to only process the encoded images which have caption lengths greater than or equal to the number of iteration to increase efficiency and reduce training time.
+
+In each iteration of LSTM network, we first put the historical state of LSTM and the encoded images into the Attention module to get the attention-masked images which have a specific highlighted area. Then we concatenate the embedded captions of all previous words and the attentioned images and feed them to the LSTM to get the next state of LSTM. Then, fully connected layers can predict the probabilities of current word embedding based on the current state and append it to the word embedding prediction matrix.
+
+## Loss Function
+We use Cross Entropy Loss
 
 ## Evaluation
-TODO
-
+Here we chose 4-gram BLEU score(BLEU-4) as our primary evaluation metric. The next step is to also investigate other metrics (such as METEOR) mentioned in relevant papers
 
 ## Result
-TODO
+See final report pdf
