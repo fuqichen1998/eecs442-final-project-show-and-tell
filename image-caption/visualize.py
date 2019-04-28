@@ -216,7 +216,7 @@ if __name__ == '__main__':
         #         plt.savefig(output_path + "/{}_caption.jpg".format(i))
         imageio.imwrite(os.path.join(output_path, str(i) + "_raw.jpg"), img_np)
         imageio.imwrite(os.path.join(output_path, str(i) + ".jpg"), image.numpy()[0].transpose(1, 2, 0))
-    Write all decoded caps into a text file
+    # Write all decoded caps into a text file
     plt.savefig(output_path + "/generated_captions.jpg")
     # ============================================================================================================
 
